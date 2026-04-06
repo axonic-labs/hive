@@ -36,7 +36,7 @@ export async function createApp() {
   } else {
     const uiDist = path.resolve(__dirname, '../../ui/dist');
     app.use('/ui', express.static(uiDist));
-    app.get('/ui/*', (_req, res) => {
+    app.get('/ui/*splat', (_req, res) => {
       res.sendFile(path.join(uiDist, 'index.html'));
     });
   }
