@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { apiGet, apiPost } from '../api/client';
+import { apiGet, apiPost, apiDelete } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 
 interface FileEntry {
@@ -17,7 +17,7 @@ export function SpaceBrowser() {
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [showCreate, setShowCreate] = useState<'file' | 'folder' | null>(null);
   const [newName, setNewName] = useState('');
-  const [newContent, setNewContent] = useState('');
+  const [error, setError] = useState('');
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -34,10 +34,7 @@ export function SpaceBrowser() {
   const files: FileEntry[] = [];
 
   entries.forEach(entry => {
-    // .keep entries mark folders — register the folder name from their path
     if (entry.filename === '.keep') {
-      // entry.path is the folder itself (e.g., "journal")
-      // If it's a direct child of currentPath, show it as a folder
       const folderPath = entry.path;
       if (currentPath) {
         if (folderPath.startsWith(currentPath + '/')) {
@@ -51,8 +48,6 @@ export function SpaceBrowser() {
     }
 
     const entryFullPath = entry.path ? `${entry.path}/${entry.filename}` : entry.filename;
-
-    // Check if this entry is at the current level
     const relativePath = currentPath
       ? entryFullPath.startsWith(currentPath + '/') ? entryFullPath.slice(currentPath.length + 1) : null
       : entryFullPath;
@@ -69,27 +64,48 @@ export function SpaceBrowser() {
 
   const handleCreateFile = async (e: React.FormEvent) => {
     e.preventDefault();
-    await apiPost(`/data/${space}/files`, {
-      path: currentPath,
-      filename: newName.endsWith('.md') ? newName : newName + '.md',
-      content: newContent || '',
-    });
-    setNewName('');
-    setNewContent('');
-    setShowCreate(null);
-    load();
+    setError('');
+    try {
+      await apiPost(`/data/${space}/files`, {
+        path: currentPath,
+        filename: newName.endsWith('.md') ? newName : newName + '.md',
+        content: '',
+      });
+      setNewName('');
+      setShowCreate(null);
+      load();
+    } catch (err: unknown) {
+      setError((err as { error?: string })?.error || 'Failed to create file');
+    }
   };
 
   const handleCreateFolder = async (e: React.FormEvent) => {
     e.preventDefault();
-    const folderPath = currentPath ? `${currentPath}/${newName}` : newName;
-    await apiPost(`/data/${space}/files`, {
-      path: folderPath,
-      filename: '.keep',
-      content: '',
-    });
-    setNewName('');
-    setShowCreate(null);
+    setError('');
+    try {
+      const folderPath = currentPath ? `${currentPath}/${newName}` : newName;
+      await apiPost(`/data/${space}/files`, {
+        path: folderPath,
+        filename: '.keep',
+        content: '',
+      });
+      setNewName('');
+      setShowCreate(null);
+      load();
+    } catch (err: unknown) {
+      setError((err as { error?: string })?.error || 'Failed to create folder');
+    }
+  };
+
+  const handleDeleteFile = async (file: FileEntry) => {
+    const filePath = file.path ? `${file.path}/${file.filename}` : file.filename;
+    await apiDelete(`/data/${space}/files/${filePath}`);
+    load();
+  };
+
+  const handleDeleteFolder = async (folderName: string) => {
+    const folderPath = currentPath ? `${currentPath}/${folderName}` : folderName;
+    await apiDelete(`/data/${space}/folders/${folderPath}`);
     load();
   };
 
@@ -156,10 +172,10 @@ export function SpaceBrowser() {
         </h1>
         {user?.is_admin && (
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-sm" onClick={() => setShowCreate(showCreate === 'folder' ? null : 'folder')}>
+            <button className="btn btn-sm" onClick={() => { setShowCreate(showCreate === 'folder' ? null : 'folder'); setError(''); }}>
               + Folder
             </button>
-            <button className="btn btn-accent btn-sm" onClick={() => setShowCreate(showCreate === 'file' ? null : 'file')}>
+            <button className="btn btn-accent btn-sm" onClick={() => { setShowCreate(showCreate === 'file' ? null : 'file'); setError(''); }}>
               + File
             </button>
           </div>
@@ -187,12 +203,16 @@ export function SpaceBrowser() {
             </div>
             <button type="submit" className="btn btn-accent btn-sm">Create</button>
           </div>
+          {error && (
+            <div style={{ color: 'var(--danger)', fontFamily: 'var(--mono)', fontSize: 12, marginTop: 8 }}>
+              {error}
+            </div>
+          )}
         </form>
       )}
 
       {/* File listing */}
       <div style={{ display: 'grid', gap: 1 }}>
-        {/* Parent directory */}
         {currentPath && (
           <Row
             icon="↩"
@@ -204,31 +224,33 @@ export function SpaceBrowser() {
           />
         )}
 
-        {/* Folders */}
         {[...folders].sort().map(folder => (
           <Row
             key={folder}
             icon="▸"
             name={folder}
             isFolder
+            canDelete={user?.is_admin}
             onClick={() => {
               const path = currentPath ? `${currentPath}/${folder}` : folder;
               navigate(`/spaces/${space}/${path}`);
             }}
+            onDelete={() => handleDeleteFolder(folder)}
           />
         ))}
 
-        {/* Files */}
         {files.sort((a, b) => a.filename.localeCompare(b.filename)).map(file => (
           <Row
             key={file.id}
             icon="◇"
             name={file.filename}
             meta={formatDate(file.updated_at)}
+            canDelete={user?.is_admin}
             onClick={() => {
               const filePath = file.path ? `${file.path}/${file.filename}` : file.filename;
               navigate(`/spaces/${space}/edit/${filePath}`);
             }}
+            onDelete={() => handleDeleteFile(file)}
           />
         ))}
 
@@ -242,28 +264,60 @@ export function SpaceBrowser() {
   );
 }
 
-function Row({ icon, name, meta, isFolder, onClick }: {
+function Row({ icon, name, meta, isFolder, canDelete, onClick, onDelete }: {
   icon: string;
   name: string;
   meta?: string;
   isFolder?: boolean;
+  canDelete?: boolean;
   onClick: () => void;
+  onDelete?: () => void;
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    setRemoving(true);
+    // Animate out
+    if (rowRef.current) {
+      rowRef.current.style.transition = 'all 0.25s ease-out';
+      rowRef.current.style.opacity = '0';
+      rowRef.current.style.maxHeight = '0';
+      rowRef.current.style.padding = '0 14px';
+      rowRef.current.style.overflow = 'hidden';
+    }
+    setTimeout(() => onDelete?.(), 250);
+  };
+
   return (
     <div
+      ref={rowRef}
       onClick={onClick}
       style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '10px 14px',
+        maxHeight: 50,
         cursor: 'pointer',
         borderRadius: 'var(--radius)',
         transition: 'background 0.1s',
         borderBottom: '1px solid var(--border-subtle)',
+        position: 'relative',
       }}
-      onMouseOver={e => (e.currentTarget.style.background = 'var(--bg-surface)')}
-      onMouseOut={e => (e.currentTarget.style.background = 'transparent')}
+      onMouseOver={e => {
+        e.currentTarget.style.background = 'var(--bg-surface)';
+      }}
+      onMouseOut={e => {
+        e.currentTarget.style.background = 'transparent';
+        if (!removing) setConfirmDelete(false);
+      }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{
@@ -284,15 +338,57 @@ function Row({ icon, name, meta, isFolder, onClick }: {
           {name}
         </span>
       </div>
-      {meta && (
-        <span style={{
-          fontFamily: 'var(--mono)',
-          fontSize: 11,
-          color: 'var(--text-muted)',
-        }}>
-          {meta}
-        </span>
-      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {meta && !confirmDelete && (
+          <span style={{
+            fontFamily: 'var(--mono)',
+            fontSize: 11,
+            color: 'var(--text-muted)',
+          }}>
+            {meta}
+          </span>
+        )}
+
+        {canDelete && (
+          confirmDelete ? (
+            <span
+              onClick={handleDelete}
+              style={{
+                fontFamily: 'var(--mono)',
+                fontSize: 11,
+                color: 'var(--danger)',
+                padding: '2px 8px',
+                borderRadius: 4,
+                background: 'var(--danger-bg)',
+                border: '1px solid rgba(196, 72, 62, 0.25)',
+                cursor: 'pointer',
+                animation: 'fadeIn 0.12s ease-out',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {isFolder ? 'delete folder + contents?' : 'delete?'}
+            </span>
+          ) : (
+            <span
+              onClick={handleDelete}
+              className="row-delete-btn"
+              style={{
+                fontFamily: 'var(--mono)',
+                fontSize: 12,
+                color: 'var(--text-muted)',
+                padding: '0 4px',
+                cursor: 'pointer',
+                opacity: 0,
+                transition: 'opacity 0.1s, color 0.1s',
+                lineHeight: 1,
+              }}
+            >
+              ×
+            </span>
+          )
+        )}
+      </div>
     </div>
   );
 }

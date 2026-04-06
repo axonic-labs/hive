@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { getSpaceConfig } from '../config/manager.js';
 import { getPool } from '../db/pools.js';
-import { listFiles, readFile, createFile, writeFile, appendFile, deleteFile, parseFilePath } from '../db/files.js';
+import { listFiles, readFile, createFile, writeFile, appendFile, deleteFile, deleteFolder, parseFilePath } from '../db/files.js';
 import { searchFiles } from '../db/search.js';
 import { checkPermission, getPermittedPrefixes } from '../middleware/permissions.js';
 import { notFound, badRequest } from '../middleware/error-handler.js';
@@ -48,8 +48,15 @@ dataRouter.post('/:space/files', checkPermission('read_write'), async (req, res,
     if (typeof content !== 'string') throw badRequest('content must be a string');
 
     const pool = getPool(space);
-    const file = await createFile(pool, space, filePath || '', filename, content);
-    res.status(201).json(file);
+    try {
+      const file = await createFile(pool, space, filePath || '', filename, content);
+      res.status(201).json(file);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('already exists')) {
+        throw badRequest(err.message);
+      }
+      throw err;
+    }
   } catch (err) {
     next(err);
   }
@@ -125,6 +132,21 @@ dataRouter.delete('/:space/files/*path', checkPermission('read_write'), async (r
     const deleted = await deleteFile(pool, space, filePath, filename);
     if (!deleted) throw notFound('File not found');
     res.json({ deleted: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Delete folder
+dataRouter.delete('/:space/folders/*path', checkPermission('read_write'), async (req, res, next) => {
+  try {
+    const space = param(req.params.space);
+    requireSpace(space);
+    const folderPath = param(req.params.path);
+
+    const pool = getPool(space);
+    const count = await deleteFolder(pool, space, folderPath);
+    res.json({ deleted: count });
   } catch (err) {
     next(err);
   }

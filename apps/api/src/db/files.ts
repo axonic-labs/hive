@@ -75,11 +75,18 @@ export async function createFile(pool: pg.Pool, space: string, filePath: string,
   const table = tableName(space);
   await ensureFolders(pool, space, filePath);
   const hash = sha256(content);
-  const result = await pool.query(
-    `INSERT INTO "${table}" (path, filename, content_text, content_hash) VALUES ($1, $2, $3, $4) RETURNING *`,
-    [filePath, filename, content, hash]
-  );
-  return result.rows[0];
+  try {
+    const result = await pool.query(
+      `INSERT INTO "${table}" (path, filename, content_text, content_hash) VALUES ($1, $2, $3, $4) RETURNING *`,
+      [filePath, filename, content, hash]
+    );
+    return result.rows[0];
+  } catch (err: unknown) {
+    if (err instanceof Error && 'code' in err && (err as { code: string }).code === '23505') {
+      throw new Error(`File "${filename}" already exists at this path`);
+    }
+    throw err;
+  }
 }
 
 export async function writeFile(pool: pg.Pool, space: string, filePath: string, filename: string, content: string): Promise<FileEntry> {
@@ -129,4 +136,14 @@ export async function deleteFile(pool: pg.Pool, space: string, filePath: string,
     [filePath, filename]
   );
   return (result.rowCount ?? 0) > 0;
+}
+
+export async function deleteFolder(pool: pg.Pool, space: string, folderPath: string): Promise<number> {
+  const table = tableName(space);
+  // Delete the .keep marker and all files under this folder (recursive)
+  const result = await pool.query(
+    `DELETE FROM "${table}" WHERE path = $1 OR path LIKE $2`,
+    [folderPath, folderPath + '/%']
+  );
+  return result.rowCount ?? 0;
 }

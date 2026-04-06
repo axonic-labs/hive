@@ -225,3 +225,11 @@ a:hover {
   border: 1px solid var(--danger);
   color: var(--danger);
 }
+
+/* Row delete button — revealed on row hover */
+div:hover > div > .row-delete-btn {
+  opacity: 1 !important;
+}
+.row-delete-btn:hover {
+  color: var(--danger) !important;
+}
