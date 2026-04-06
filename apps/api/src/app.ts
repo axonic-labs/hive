@@ -23,27 +23,25 @@ export async function createApp() {
   app.use('/api/admin/users', auth, admin, adminUsersRouter);
   app.use('/api/data', auth, dataRouter);
 
-  // Serve UI
+  // Error handler for API routes
+  app.use('/api', errorHandler);
+
+  // Serve UI at root (after all /api routes)
   if (process.env.NODE_ENV !== 'production') {
     const { createServer } = await import('vite');
     const vite = await createServer({
       root: path.resolve(__dirname, '../../ui'),
       server: { middlewareMode: true },
       appType: 'spa',
-      base: '/ui/',
     });
-    app.use('/ui', vite.middlewares);
+    app.use(vite.middlewares);
   } else {
     const uiDist = path.resolve(__dirname, '../../ui/dist');
-    app.use('/ui', express.static(uiDist));
-    app.get('/ui/*splat', (_req, res) => {
+    app.use(express.static(uiDist));
+    app.get('*splat', (_req, res) => {
       res.sendFile(path.join(uiDist, 'index.html'));
     });
   }
-
-  app.get('/', (_req, res) => res.redirect('/ui'));
-
-  app.use(errorHandler);
 
   return app;
 }

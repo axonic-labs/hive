@@ -3,6 +3,13 @@ import { getSpaceConfig } from '../config/manager.js';
 
 const pools = new Map<string, pg.Pool>();
 
+function createPool(connectionString: string): pg.Pool {
+  return new pg.Pool({
+    connectionString,
+    ssl: connectionString.includes('supabase.com') ? { rejectUnauthorized: false } : undefined,
+  });
+}
+
 export function getPool(space: string): pg.Pool {
   let pool = pools.get(space);
   if (pool) return pool;
@@ -12,7 +19,7 @@ export function getPool(space: string): pg.Pool {
     throw new Error(`No config found for space "${space}"`);
   }
 
-  pool = new pg.Pool({ connectionString: config.database_url });
+  pool = createPool(config.database_url);
   pools.set(space, pool);
   return pool;
 }
@@ -25,13 +32,13 @@ export async function removePool(space: string): Promise<void> {
   }
 }
 
-export async function testConnection(databaseUrl: string): Promise<boolean> {
-  const pool = new pg.Pool({ connectionString: databaseUrl });
+export async function testConnection(databaseUrl: string): Promise<string | null> {
+  const pool = createPool(databaseUrl);
   try {
     await pool.query('SELECT 1');
-    return true;
-  } catch {
-    return false;
+    return null;
+  } catch (err) {
+    return err instanceof Error ? err.message : 'Unknown error';
   } finally {
     await pool.end();
   }

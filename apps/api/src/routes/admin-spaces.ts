@@ -25,9 +25,9 @@ adminSpacesRouter.post('/', async (req, res, next) => {
       throw badRequest('database_url is required');
     }
 
-    const connected = await testConnection(database_url);
-    if (!connected) {
-      throw badRequest('Could not connect to the provided database URL');
+    const connError = await testConnection(database_url);
+    if (connError) {
+      throw badRequest(`Could not connect: ${connError}`);
     }
 
     saveSpaceConfig(name, { type, database_url });

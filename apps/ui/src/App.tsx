@@ -19,7 +19,7 @@ export function App() {
 
   return (
     <AuthContext.Provider value={auth}>
-      <BrowserRouter basename="/ui">
+      <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route element={

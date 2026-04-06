@@ -63,11 +63,10 @@ async function ensureFolders(pool: pg.Pool, space: string, filePath: string): Pr
   const table = tableName(space);
   const parts = filePath.split('/');
   for (let i = 0; i < parts.length; i++) {
-    const folderPath = parts.slice(0, i).join('/');
-    const folderName = parts[i];
+    const folderFullPath = parts.slice(0, i + 1).join('/');
     await pool.query(
-      `INSERT INTO "${table}" (path, filename) VALUES ($1, $2) ON CONFLICT (path, filename) DO NOTHING`,
-      [folderPath, folderName]
+      `INSERT INTO "${table}" (path, filename) VALUES ($1, '.keep') ON CONFLICT (path, filename) DO NOTHING`,
+      [folderFullPath]
     );
   }
 }

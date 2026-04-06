@@ -34,9 +34,23 @@ export function SpaceBrowser() {
   const files: FileEntry[] = [];
 
   entries.forEach(entry => {
-    const entryFullPath = entry.path ? `${entry.path}/${entry.filename}` : entry.filename;
+    // .keep entries mark folders — register the folder name from their path
+    if (entry.filename === '.keep') {
+      // entry.path is the folder itself (e.g., "journal")
+      // If it's a direct child of currentPath, show it as a folder
+      const folderPath = entry.path;
+      if (currentPath) {
+        if (folderPath.startsWith(currentPath + '/')) {
+          const relative = folderPath.slice(currentPath.length + 1);
+          if (!relative.includes('/')) folders.add(relative);
+        }
+      } else {
+        if (!folderPath.includes('/')) folders.add(folderPath);
+      }
+      return;
+    }
 
-    if (entry.filename === '.keep') return; // skip folder markers from display
+    const entryFullPath = entry.path ? `${entry.path}/${entry.filename}` : entry.filename;
 
     // Check if this entry is at the current level
     const relativePath = currentPath
