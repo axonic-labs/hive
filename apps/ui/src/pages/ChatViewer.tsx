@@ -2,22 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiGet, apiPost, apiDelete } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
-
-interface ChatMessage {
-  id: string;
-  thread: string;
-  author: string;
-  source: string | null;
-  content: string;
-  created_by: string | null;
-  created_at: string;
-}
-
-interface ThreadSummary {
-  thread: string;
-  message_count: number;
-  last_message_at: string;
-}
+import type { ChatMessage, ThreadSummary } from '@hive/shared';
 
 export function ChatViewer() {
   const { space } = useParams();
@@ -72,16 +57,11 @@ export function ChatViewer() {
   const handleCreateThread = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newThread.trim()) return;
-    // Create thread by posting a system message
-    await apiPost(`/data/${space}/messages`, {
-      thread: newThread.trim(),
-      author: 'system',
-      content: `Thread created`,
-    });
+    // Thread is just a column value — selecting it is enough, first message creates it
     setSelectedThread(newThread.trim());
+    setMessages([]);
     setNewThread('');
     setShowNewThread(false);
-    loadThreads();
   };
 
   const handleDeleteMessage = async (id: string) => {
@@ -185,7 +165,7 @@ export function ChatViewer() {
               <div
                 key={t.thread}
                 onClick={() => setSelectedThread(t.thread)}
-                onMouseOut={() => setConfirmDeleteThread(null)}
+                onMouseLeave={() => setConfirmDeleteThread(null)}
                 style={{
                   padding: '8px 12px',
                   cursor: 'pointer',
@@ -345,7 +325,7 @@ function MessageRow({ msg, canDelete, onDelete }: {
         display: 'flex', gap: 10, padding: '6px 0',
         opacity: isSystem ? 0.5 : 1,
       }}
-      onMouseOut={() => setConfirmDel(false)}
+      onMouseLeave={() => setConfirmDel(false)}
     >
       {/* Timestamp */}
       <span style={{
