@@ -110,16 +110,13 @@ export async function appendFile(pool: pg.Pool, space: string, filePath: string,
   if (existing.rows.length > 0) {
     const result = await pool.query(
       `UPDATE "${table}" SET content_text = coalesce(content_text, '') || E'\\n' || $3,
-       content_hash = encode(sha256(coalesce(content_text, '') || E'\\n' || $3::bytea), 'hex'),
        updated_at = now()
        WHERE path = $1 AND filename = $2 RETURNING *`,
       [filePath, filename, content]
     );
-    // Recompute hash in app since Postgres sha256 syntax varies
     const row = result.rows[0];
-    const hash = sha256(row.content_text);
-    await pool.query(`UPDATE "${table}" SET content_hash = $1 WHERE id = $2`, [hash, row.id]);
-    row.content_hash = hash;
+    row.content_hash = sha256(row.content_text);
+    await pool.query(`UPDATE "${table}" SET content_hash = $1 WHERE id = $2`, [row.content_hash, row.id]);
     return row;
   }
 
