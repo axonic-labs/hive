@@ -1,4 +1,5 @@
 import { Router, type Request } from 'express';
+import { getSpaceConfig } from '../config/manager.js';
 import { getPool } from '../db/pools.js';
 import { createMessage, listMessages, deleteMessage, listThreads, deleteThread, searchMessages } from '../db/messages.js';
 import { checkSpaceAccess } from '../middleware/permissions.js';
@@ -6,17 +7,23 @@ import { badRequest, notFound } from '../middleware/error-handler.js';
 
 export const chatDataRouter = Router({ mergeParams: true });
 
-chatDataRouter.use(checkSpaceAccess());
-
 function getSpace(req: Request): string {
   const s = req.params.space;
   return Array.isArray(s) ? s[0] : s;
 }
 
+function requireSpace(space: string) {
+  if (!getSpaceConfig(space)) throw notFound(`Space "${space}" not found`);
+}
+
+// Read routes: require any grant
+chatDataRouter.use(checkSpaceAccess('read'));
+
 // Post a message
-chatDataRouter.post('/messages', async (req, res, next) => {
+chatDataRouter.post('/messages', checkSpaceAccess('read_write'), async (req, res, next) => {
   try {
     const space = getSpace(req);
+    requireSpace(space);
     const { thread, author, content, source } = req.body;
 
     if (!author || typeof author !== 'string') throw badRequest('author is required');
@@ -40,9 +47,10 @@ chatDataRouter.post('/messages', async (req, res, next) => {
 chatDataRouter.get('/messages', async (req, res, next) => {
   try {
     const space = getSpace(req);
+    requireSpace(space);
     const thread = req.query.thread as string | undefined;
-    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
-    const offset = parseInt(req.query.offset as string) || 0;
+    const limit = Math.min(Math.max(1, parseInt(req.query.limit as string) || 50), 200);
+    const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
 
     const pool = getPool(space);
     const messages = await listMessages(pool, space, thread, limit, offset);
@@ -53,9 +61,10 @@ chatDataRouter.get('/messages', async (req, res, next) => {
 });
 
 // Delete message
-chatDataRouter.delete('/messages/:id', async (req, res, next) => {
+chatDataRouter.delete('/messages/:id', checkSpaceAccess('read_write'), async (req, res, next) => {
   try {
     const space = getSpace(req);
+    requireSpace(space);
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
     const pool = getPool(space);
@@ -71,6 +80,7 @@ chatDataRouter.delete('/messages/:id', async (req, res, next) => {
 chatDataRouter.get('/threads', async (req, res, next) => {
   try {
     const space = getSpace(req);
+    requireSpace(space);
     const pool = getPool(space);
     const threads = await listThreads(pool, space);
     res.json(threads);
@@ -80,9 +90,10 @@ chatDataRouter.get('/threads', async (req, res, next) => {
 });
 
 // Delete thread
-chatDataRouter.delete('/threads/:thread', async (req, res, next) => {
+chatDataRouter.delete('/threads/:thread', checkSpaceAccess('read_write'), async (req, res, next) => {
   try {
     const space = getSpace(req);
+    requireSpace(space);
     const thread = decodeURIComponent(Array.isArray(req.params.thread) ? req.params.thread[0] : req.params.thread);
 
     const pool = getPool(space);
@@ -97,6 +108,7 @@ chatDataRouter.delete('/threads/:thread', async (req, res, next) => {
 chatDataRouter.get('/search', async (req, res, next) => {
   try {
     const space = getSpace(req);
+    requireSpace(space);
     const q = req.query.q as string;
     if (!q) throw badRequest('q query parameter is required');
 

@@ -23,7 +23,9 @@ dataRouter.use('/:space', (req, res, next) => {
   const space = param(req.params.space);
   const config = getSpaceConfig(space);
   if (config && (config.schema || 'files') === 'chatlog') {
-    return chatDataRouter(req, res, next);
+    return chatDataRouter(req, res, () => {
+      res.status(404).json({ error: 'Not found', status: 404 });
+    });
   }
   next();
 });

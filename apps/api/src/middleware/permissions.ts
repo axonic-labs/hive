@@ -35,13 +35,17 @@ export function checkPermission(requiredAccess: 'read' | 'read_write') {
   };
 }
 
-export function checkSpaceAccess() {
+export function checkSpaceAccess(requiredAccess: 'read' | 'read_write' = 'read') {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (req.user!.is_admin) { next(); return; }
 
     const space = Array.isArray(req.params.space) ? req.params.space[0] : req.params.space;
     const grants = getUserGrantsForSpace(req.user!.id, space);
     if (grants.length === 0) {
+      res.status(403).json({ error: 'Forbidden', status: 403 });
+      return;
+    }
+    if (requiredAccess === 'read_write' && !grants.some(g => g.access === 'read_write')) {
       res.status(403).json({ error: 'Forbidden', status: 403 });
       return;
     }

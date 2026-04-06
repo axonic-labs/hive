@@ -86,15 +86,15 @@ export function Spaces() {
                   icon="⬡"
                   title="Files"
                   description="Markdown files in folders. Notes, docs, configs."
-                  selected={false}
+                  selected={schema === 'files'}
                   onClick={() => setSchema('files')}
                 />
                 <SchemaCard
                   icon="◈"
                   title="Chatlog"
                   description="Threaded message streams. Journals, bot conversations, chat logs."
+                  selected={schema === 'chatlog'}
                   onClick={() => setSchema('chatlog')}
-                  selected={false}
                 />
               </div>
             </div>
