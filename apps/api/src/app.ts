@@ -5,6 +5,7 @@ import { errorHandler } from './middleware/error-handler.js';
 import { authRouter } from './routes/auth.js';
 import { adminSpacesRouter } from './routes/admin-spaces.js';
 import { adminUsersRouter } from './routes/admin-users.js';
+import { adminAgentsRouter } from './routes/admin-agents.js';
 import { dataRouter } from './routes/data.js';
 import { auth } from './middleware/auth.js';
 import { admin } from './middleware/admin.js';
@@ -21,6 +22,7 @@ export async function createApp() {
   app.use('/api/auth', authRouter);
   app.use('/api/admin/spaces', auth, admin, adminSpacesRouter);
   app.use('/api/admin/users', auth, admin, adminUsersRouter);
+  app.use('/api/admin/agents', auth, admin, adminAgentsRouter);
   app.use('/api/data', auth, dataRouter);
 
   // Error handler for API routes
