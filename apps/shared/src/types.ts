@@ -25,10 +25,28 @@ export interface SpacePermissionEntry {
 export interface SpaceConfig {
   type: 'postgres';
   database_url: string;
+  schema?: 'files' | 'chatlog';
 }
 
 export interface SpaceMeta {
   name: string;
+  schema: 'files' | 'chatlog';
+}
+
+export interface ChatMessage {
+  id: string;
+  thread: string;
+  author: string;
+  source: string | null;
+  content: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface ThreadSummary {
+  thread: string;
+  message_count: number;
+  last_message_at: string;
 }
 
 export interface FileEntry {
