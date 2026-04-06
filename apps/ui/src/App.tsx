@@ -5,7 +5,7 @@ import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Login';
 import { Spaces } from './pages/Spaces';
-import { SpaceBrowser } from './pages/SpaceBrowser';
+import { SpaceRouter } from './pages/SpaceRouter';
 import { FileEditor } from './pages/FileEditor';
 import { Users } from './pages/Users';
 import { UserDetail } from './pages/UserDetail';
@@ -27,8 +27,8 @@ export function App() {
           }>
             <Route path="/spaces" element={<Spaces />} />
             <Route path="/spaces/:space/edit/*" element={<FileEditor />} />
-            <Route path="/spaces/:space" element={<SpaceBrowser />} />
-            <Route path="/spaces/:space/*" element={<SpaceBrowser />} />
+            <Route path="/spaces/:space" element={<SpaceRouter />} />
+            <Route path="/spaces/:space/*" element={<SpaceRouter />} />
             <Route path="/users" element={
               <ProtectedRoute adminOnly><Users /></ProtectedRoute>
             } />

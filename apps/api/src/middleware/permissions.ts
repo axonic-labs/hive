@@ -35,6 +35,20 @@ export function checkPermission(requiredAccess: 'read' | 'read_write') {
   };
 }
 
+export function checkSpaceAccess() {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (req.user!.is_admin) { next(); return; }
+
+    const space = Array.isArray(req.params.space) ? req.params.space[0] : req.params.space;
+    const grants = getUserGrantsForSpace(req.user!.id, space);
+    if (grants.length === 0) {
+      res.status(403).json({ error: 'Forbidden', status: 403 });
+      return;
+    }
+    next();
+  };
+}
+
 export function getPermittedPrefixes(userId: string, space: string): string[] | '*' {
   const grants = getUserGrantsForSpace(userId, space);
   if (grants.length === 0) return [];

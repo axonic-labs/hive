@@ -34,3 +34,33 @@ export async function dropSpaceTable(pool: pg.Pool, space: string): Promise<void
   const table = tableName(space);
   await pool.query(`DROP TABLE IF EXISTS "${table}"`);
 }
+
+// Chatlog schema
+
+export function chatTableName(space: string): string {
+  if (!validateSpaceName(space)) throw new Error(`Invalid space name: ${space}`);
+  return `hivechat_${space}`;
+}
+
+export async function createChatlogTable(pool: pg.Pool, space: string): Promise<void> {
+  const table = chatTableName(space);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "${table}" (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      thread TEXT NOT NULL DEFAULT 'default',
+      author TEXT NOT NULL,
+      source TEXT,
+      content TEXT NOT NULL,
+      created_by TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS "idx_chat_${space}_thread" ON "${table}" (thread)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS "idx_chat_${space}_created" ON "${table}" (created_at)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS "idx_chat_${space}_fulltext" ON "${table}" USING gin(to_tsvector('english', content))`);
+}
+
+export async function dropChatlogTable(pool: pg.Pool, space: string): Promise<void> {
+  const table = chatTableName(space);
+  await pool.query(`DROP TABLE IF EXISTS "${table}"`);
+}
