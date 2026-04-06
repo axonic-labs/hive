@@ -20,6 +20,8 @@ export function FileEditor() {
   const isMarkdown = filePath?.endsWith('.md') || filePath?.endsWith('.mdx');
 
   useEffect(() => {
+    setMode('view');
+    setLoading(true);
     const load = async () => {
       try {
         const text = await apiGetText(`/data/${space}/files/${filePath}`);
@@ -64,13 +66,9 @@ export function FileEditor() {
     }
   };
 
-  const switchToEdit = () => {
+  const handleEdit = () => {
     setMode('edit');
-    setTimeout(() => textareaRef.current?.focus(), 0);
-  };
-
-  const switchToView = () => {
-    setMode('view');
+    requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
   const isDirty = content !== originalContent;
@@ -118,7 +116,7 @@ export function FileEditor() {
               overflow: 'hidden',
             }}>
               <button
-                onClick={switchToView}
+                onClick={() => setMode('view')}
                 style={{
                   padding: '4px 10px',
                   fontSize: 12,
@@ -133,7 +131,7 @@ export function FileEditor() {
                 view
               </button>
               <button
-                onClick={switchToEdit}
+                onClick={handleEdit}
                 style={{
                   padding: '4px 10px',
                   fontSize: 12,
@@ -176,7 +174,7 @@ export function FileEditor() {
             borderRadius: 'var(--radius-lg)',
             cursor: 'text',
           }}
-          onDoubleClick={switchToEdit}
+          onDoubleClick={handleEdit}
         >
           {content ? (
             <Markdown remarkPlugins={[remarkGfm]}>{content}</Markdown>
