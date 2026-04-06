@@ -1,6 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiGetText, apiPutText } from '../api/client';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
+type Mode = 'view' | 'edit';
 
 export function FileEditor() {
   const { space, '*': filePath } = useParams();
@@ -9,7 +13,11 @@ export function FileEditor() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [mode, setMode] = useState<Mode>('view');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const navigate = useNavigate();
+
+  const isMarkdown = filePath?.endsWith('.md') || filePath?.endsWith('.mdx');
 
   useEffect(() => {
     const load = async () => {
@@ -44,7 +52,6 @@ export function FileEditor() {
       e.preventDefault();
       handleSave();
     }
-    // Tab inserts spaces
     if (e.key === 'Tab') {
       e.preventDefault();
       const target = e.target as HTMLTextAreaElement;
@@ -57,10 +64,22 @@ export function FileEditor() {
     }
   };
 
+  const switchToEdit = () => {
+    setMode('edit');
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  };
+
+  const switchToView = () => {
+    setMode('view');
+  };
+
   const isDirty = content !== originalContent;
   const pathParts = filePath?.split('/') || [];
   const filename = pathParts[pathParts.length - 1];
   const folderPath = pathParts.slice(0, -1).join('/');
+
+  // Non-markdown files always show editor
+  const showRendered = isMarkdown && mode === 'view';
 
   return (
     <div className="fade-in" style={{ height: 'calc(100vh - 96px)', display: 'flex', flexDirection: 'column' }}>
@@ -89,6 +108,49 @@ export function FileEditor() {
               saved
             </span>
           )}
+
+          {/* View/Edit toggle */}
+          {isMarkdown && (
+            <div style={{
+              display: 'flex',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              overflow: 'hidden',
+            }}>
+              <button
+                onClick={switchToView}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: 12,
+                  fontFamily: 'var(--mono)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: mode === 'view' ? 'var(--bg-hover)' : 'transparent',
+                  color: mode === 'view' ? 'var(--text-primary)' : 'var(--text-muted)',
+                  transition: 'all 0.12s',
+                }}
+              >
+                view
+              </button>
+              <button
+                onClick={switchToEdit}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: 12,
+                  fontFamily: 'var(--mono)',
+                  border: 'none',
+                  borderLeft: '1px solid var(--border)',
+                  cursor: 'pointer',
+                  background: mode === 'edit' ? 'var(--bg-hover)' : 'transparent',
+                  color: mode === 'edit' ? 'var(--text-primary)' : 'var(--text-muted)',
+                  transition: 'all 0.12s',
+                }}
+              >
+                edit
+              </button>
+            </div>
+          )}
+
           <button
             className="btn btn-accent btn-sm"
             onClick={handleSave}
@@ -99,11 +161,34 @@ export function FileEditor() {
         </div>
       </div>
 
-      {/* Editor */}
+      {/* Content area */}
       {loading ? (
         <div className="empty-state">Loading...</div>
+      ) : showRendered ? (
+        <div
+          className="markdown-body"
+          style={{
+            flex: 1,
+            overflow: 'auto',
+            padding: '28px 32px',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-lg)',
+            cursor: 'text',
+          }}
+          onDoubleClick={switchToEdit}
+        >
+          {content ? (
+            <Markdown remarkPlugins={[remarkGfm]}>{content}</Markdown>
+          ) : (
+            <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+              Empty file. Double-click or press edit to start writing.
+            </p>
+          )}
+        </div>
       ) : (
         <textarea
+          ref={textareaRef}
           value={content}
           onChange={e => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -135,7 +220,7 @@ export function FileEditor() {
         textAlign: 'right',
         flexShrink: 0,
       }}>
-        ⌘S to save
+        {showRendered ? 'double-click to edit' : '⌘S to save'}
       </div>
     </div>
   );
