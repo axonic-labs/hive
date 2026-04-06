@@ -13,6 +13,7 @@ export function FileEditor() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [mode, setMode] = useState<Mode>('view');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const navigate = useNavigate();
@@ -39,11 +40,15 @@ export function FileEditor() {
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveError(false);
     try {
       await apiPutText(`/data/${space}/files/${filePath}`, content);
       setOriginalContent(content);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
+    } catch {
+      setSaveError(true);
+      setTimeout(() => setSaveError(false), 3000);
     } finally {
       setSaving(false);
     }
@@ -104,6 +109,11 @@ export function FileEditor() {
           {saved && (
             <span style={{ color: 'var(--success)', fontFamily: 'var(--mono)', fontSize: 12 }}>
               saved
+            </span>
+          )}
+          {saveError && (
+            <span style={{ color: 'var(--danger)', fontFamily: 'var(--mono)', fontSize: 12 }}>
+              save failed
             </span>
           )}
 
@@ -177,7 +187,16 @@ export function FileEditor() {
           onDoubleClick={handleEdit}
         >
           {content ? (
-            <Markdown remarkPlugins={[remarkGfm]}>{content}</Markdown>
+            <Markdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                a: ({ href, children }) => (
+                  <a href={href} target="_blank" rel="noreferrer">{children}</a>
+                ),
+              }}
+            >
+              {content}
+            </Markdown>
           ) : (
             <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
               Empty file. Double-click or press edit to start writing.
@@ -218,7 +237,7 @@ export function FileEditor() {
         textAlign: 'right',
         flexShrink: 0,
       }}>
-        {showRendered ? 'double-click to edit' : '⌘S to save'}
+        {showRendered ? 'double-click to edit' : isDirty ? '⌘S to save' : '\u00A0'}
       </div>
     </div>
   );
