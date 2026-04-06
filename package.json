@@ -1,0 +1,9 @@
+{
+  "name": "hive",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @hive/api dev",
+    "build": "pnpm --filter @hive/shared build && pnpm --filter @hive/ui build && pnpm --filter @hive/api build",
+    "start": "pnpm --filter @hive/api start"
+  }
+}
