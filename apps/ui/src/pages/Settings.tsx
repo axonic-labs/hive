@@ -14,12 +14,14 @@ export function Settings() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const [hasExistingKey, setHasExistingKey] = useState(false);
+  const [keyEdited, setKeyEdited] = useState(false);
 
   useEffect(() => {
     apiGet<LLMConfig | null>('/admin/agents/config/llm').then(data => {
       if (data) {
         setProvider(data.provider);
-        setApiKey(data.api_key); // masked from server
+        setHasExistingKey(true);
         setDefaultModel(data.default_model);
       }
       setLoaded(true);
@@ -29,9 +31,18 @@ export function Settings() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (!hasExistingKey && !apiKey) {
+      setError('API key is required');
+      return;
+    }
     try {
-      await apiPut('/admin/agents/config/llm', { provider, api_key: apiKey, default_model: defaultModel });
+      const body: Record<string, string> = { provider, default_model: defaultModel };
+      if (keyEdited && apiKey) body.api_key = apiKey;
+      await apiPut('/admin/agents/config/llm', body);
       setSaved(true);
+      setHasExistingKey(true);
+      setKeyEdited(false);
+      setApiKey('');
       setTimeout(() => setSaved(false), 2000);
     } catch (err: unknown) {
       setError((err as { error?: string })?.error || 'Failed to save');
@@ -72,9 +83,9 @@ export function Settings() {
                 className="input"
                 type="password"
                 value={apiKey}
-                onChange={e => setApiKey(e.target.value)}
-                placeholder="sk-ant-..."
-                required
+                onChange={e => { setApiKey(e.target.value); setKeyEdited(true); }}
+                placeholder={hasExistingKey ? '••••••••  (leave empty to keep current)' : 'sk-ant-...'}
+                required={!hasExistingKey}
               />
             </div>
             <div>

@@ -1,25 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiGet, apiPut, apiPost } from '../api/client';
+import type { AgentConfig } from '@hive/shared';
 
-interface AgentConfig {
-  name: string;
-  user_id: string;
-  schedule: string | null;
-  model: string | null;
-  prompt: string;
-  enabled: boolean;
-  timeout_ms: number;
-  log_space: string;
-  log_thread_prefix: string;
-  created_at: string;
+interface AgentWithRunning extends AgentConfig {
   running?: boolean;
 }
 
 export function AgentDetail() {
   const { name } = useParams();
   const navigate = useNavigate();
-  const [agent, setAgent] = useState<AgentConfig | null>(null);
+  const [agent, setAgent] = useState<AgentWithRunning | null>(null);
   const [prompt, setPrompt] = useState('');
   const [schedule, setSchedule] = useState('');
   const [model, setModel] = useState('');
@@ -28,7 +19,7 @@ export function AgentDetail() {
   const [running, setRunning] = useState(false);
 
   useEffect(() => {
-    apiGet<AgentConfig>(`/admin/agents/${name}`).then(data => {
+    apiGet<AgentWithRunning>(`/admin/agents/${name}`).then(data => {
       setAgent(data);
       setPrompt(data.prompt);
       setSchedule(data.schedule || '');
@@ -48,8 +39,24 @@ export function AgentDetail() {
 
   const handleRun = async () => {
     setRunning(true);
-    await apiPost(`/admin/agents/${name}/run`);
-    setTimeout(() => setRunning(false), 5000);
+    try {
+      await apiPost(`/admin/agents/${name}/run`);
+      // Poll until agent finishes
+      const poll = setInterval(async () => {
+        try {
+          const data = await apiGet<AgentWithRunning>(`/admin/agents/${name}`);
+          if (!data.running) {
+            setRunning(false);
+            clearInterval(poll);
+          }
+        } catch {
+          setRunning(false);
+          clearInterval(poll);
+        }
+      }, 3000);
+    } catch {
+      setRunning(false);
+    }
   };
 
   if (!agent) return null;

@@ -64,7 +64,10 @@ export async function executeAgent(name: string): Promise<AgentRunSummary> {
     await logToThread(baseUrl, user.api_key, config.log_space, threadName, name, `▶ Agent run started`);
 
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('timeout')), config.timeout_ms);
+      setTimeout(() => {
+        abortController.abort();
+        reject(new Error('timeout'));
+      }, config.timeout_ms);
     });
 
     const result = await Promise.race([

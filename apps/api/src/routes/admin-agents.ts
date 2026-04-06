@@ -162,11 +162,14 @@ adminAgentsRouter.put('/config/llm', (req, res, next) => {
   try {
     const { provider, api_key, default_model } = req.body;
     if (!provider || !['anthropic', 'openai'].includes(provider)) throw badRequest('provider must be "anthropic" or "openai"');
-    if (!api_key) throw badRequest('api_key is required');
     if (!default_model) throw badRequest('default_model is required');
 
-    saveLLMConfig({ provider, api_key, default_model });
-    res.json({ provider, default_model, api_key: api_key.slice(0, 10) + '...' + api_key.slice(-4) });
+    const existing = getLLMConfig();
+    const finalKey = api_key || existing?.api_key;
+    if (!finalKey) throw badRequest('api_key is required');
+
+    saveLLMConfig({ provider, api_key: finalKey, default_model });
+    res.json({ provider, default_model, api_key: finalKey.slice(0, 10) + '...' + finalKey.slice(-4) });
   } catch (err) {
     next(err);
   }

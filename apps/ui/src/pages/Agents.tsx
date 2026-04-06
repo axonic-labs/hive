@@ -1,18 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiGet, apiPost, apiDelete } from '../api/client';
+import type { AgentConfig } from '@hive/shared';
 
-interface AgentConfig {
-  name: string;
-  user_id: string;
-  schedule: string | null;
-  model: string | null;
-  prompt: string;
-  enabled: boolean;
-  timeout_ms: number;
-  log_space: string;
-  log_thread_prefix: string;
-  created_at: string;
+interface AgentWithExtras extends AgentConfig {
   api_key?: string;
   running?: boolean;
 }
@@ -23,7 +14,7 @@ interface SpaceInfo {
 }
 
 export function Agents() {
-  const [agents, setAgents] = useState<AgentConfig[]>([]);
+  const [agents, setAgents] = useState<AgentWithExtras[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [spaces, setSpaces] = useState<SpaceInfo[]>([]);
   const [name, setName] = useState('');
@@ -38,7 +29,7 @@ export function Agents() {
 
   const load = async () => {
     const [data, spaceData] = await Promise.all([
-      apiGet<AgentConfig[]>('/admin/agents'),
+      apiGet<AgentWithExtras[]>('/admin/agents'),
       apiGet<SpaceInfo[]>('/admin/spaces'),
     ]);
     setAgents(data);
@@ -55,7 +46,7 @@ export function Agents() {
     e.preventDefault();
     setError('');
     try {
-      const result = await apiPost<AgentConfig>('/admin/agents', {
+      const result = await apiPost<AgentWithExtras>('/admin/agents', {
         name, prompt, schedule: schedule || null, log_space: logSpace,
       });
       setCreatedKey(result.api_key!);
@@ -73,11 +64,22 @@ export function Agents() {
     setRunningAgents(prev => new Set(prev).add(agentName));
     try {
       await apiPost(`/admin/agents/${agentName}/run`);
-    } catch { /* ignore */ }
-    // Keep showing as running for a bit
-    setTimeout(() => {
+      // Poll until agent finishes
+      const poll = setInterval(async () => {
+        try {
+          const data = await apiGet<AgentWithExtras>(`/admin/agents/${agentName}`);
+          if (!data.running) {
+            setRunningAgents(prev => { const s = new Set(prev); s.delete(agentName); return s; });
+            clearInterval(poll);
+          }
+        } catch {
+          setRunningAgents(prev => { const s = new Set(prev); s.delete(agentName); return s; });
+          clearInterval(poll);
+        }
+      }, 3000);
+    } catch {
       setRunningAgents(prev => { const s = new Set(prev); s.delete(agentName); return s; });
-    }, 5000);
+    }
   };
 
   const handleDelete = async (agentName: string) => {
