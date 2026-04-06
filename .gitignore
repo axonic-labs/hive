@@ -4,3 +4,4 @@ dist/
 .env
 /data/
 skills/*/secrets.md
+.claude/
