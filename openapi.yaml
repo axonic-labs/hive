@@ -1,0 +1,673 @@
+openapi: 3.1.0
+info:
+  title: Hive API
+  description: |
+    Personal cloud API. Your domain = your identity = your cloud.
+    Agents and people get scoped access to files organized in spaces.
+  version: 0.1.0
+  contact:
+    name: Jan
+    email: jan@yaneq.com
+  license:
+    name: MIT
+
+servers:
+  - url: https://hive.yaneq.com/api
+    description: Production
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: API key issued by the Hive admin. Pass as `Authorization: Bearer <key>`.
+
+  schemas:
+    Error:
+      type: object
+      required: [error, status]
+      properties:
+        error:
+          type: string
+          example: File not found
+        status:
+          type: integer
+          example: 404
+
+    UserInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: journal-bot
+        is_admin:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    UserWithKey:
+      allOf:
+        - $ref: '#/components/schemas/UserInfo'
+        - type: object
+          properties:
+            api_key:
+              type: string
+              description: Only returned once at creation time.
+              example: hive_a3f8b2c1d4e5f6a7b8c9d0e1f2a3b4c5
+
+    Space:
+      type: object
+      properties:
+        name:
+          type: string
+          example: notes
+
+    FileListEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        path:
+          type: string
+          example: journal
+        filename:
+          type: string
+          example: 2026-04-05.md
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    FileEntry:
+      allOf:
+        - $ref: '#/components/schemas/FileListEntry'
+        - type: object
+          properties:
+            content_text:
+              type: string
+              nullable: true
+            content_blob:
+              type: string
+              format: byte
+              nullable: true
+            content_hash:
+              type: string
+              nullable: true
+              description: SHA-256 of content
+
+    PermissionGrant:
+      type: object
+      required: [path, access]
+      properties:
+        path:
+          type: string
+          description: Folder path prefix. Use `*` for full space access.
+          example: journal/
+        access:
+          type: string
+          enum: [read, read_write]
+
+    SpacePermissionEntry:
+      type: object
+      required: [user_id, grants]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        grants:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionGrant'
+
+    SearchResult:
+      allOf:
+        - $ref: '#/components/schemas/FileListEntry'
+        - type: object
+          properties:
+            headline:
+              type: string
+              description: Highlighted text snippet from the match
+            rank:
+              type: number
+              description: Relevance score
+
+  responses:
+    Unauthorized:
+      description: Invalid or missing API key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: No permission for this resource
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+paths:
+  # ── Auth ──────────────────────────────────────────────
+  /auth/verify:
+    post:
+      tags: [Auth]
+      summary: Verify API key
+      description: Validates the Bearer token and returns the associated user info.
+      responses:
+        '200':
+          description: Valid key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ── Data: Files ───────────────────────────────────────
+  /data/{space}/files:
+    get:
+      tags: [Files]
+      summary: List files
+      description: Returns files and folders visible to the authenticated user. Results are filtered by permissions.
+      parameters:
+        - name: space
+          in: path
+          required: true
+          schema:
+            type: string
+          example: notes
+        - name: prefix
+          in: query
+          schema:
+            type: string
+          description: Filter by folder path prefix
+          example: journal/
+      responses:
+        '200':
+          description: File listing
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FileListEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Files]
+      summary: Create file
+      description: Creates a new file. Returns 400 if a file with the same path and name already exists.
+      parameters:
+        - name: space
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename, content]
+              properties:
+                path:
+                  type: string
+                  description: Folder path (empty string for root)
+                  example: journal
+                filename:
+                  type: string
+                  example: 2026-04-05.md
+                content:
+                  type: string
+                  example: "# April 5th\nBuilding Hive today."
+      responses:
+        '201':
+          description: File created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileEntry'
+        '400':
+          description: Bad request or file already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /data/{space}/files/{path}:
+    get:
+      tags: [Files]
+      summary: Read file
+      description: Returns file content as plain text (for text files) or binary.
+      parameters:
+        - name: space
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          example: journal/2026-04-05.md
+      responses:
+        '200':
+          description: File content
+          content:
+            text/plain:
+              schema:
+                type: string
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Files]
+      summary: Write file
+      description: Creates or overwrites a file with the provided content.
+      parameters:
+        - name: space
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+      responses:
+        '200':
+          description: File written
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileEntry'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    patch:
+      tags: [Files]
+      summary: Append to file
+      description: |
+        Appends content to an existing file with an automatic newline separator.
+        Creates the file if it doesn't exist.
+      parameters:
+        - name: space
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  example: "New line appended by agent."
+      responses:
+        '200':
+          description: Content appended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileEntry'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    delete:
+      tags: [Files]
+      summary: Delete file
+      parameters:
+        - name: space
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Data: Folders ─────────────────────────────────────
+  /data/{space}/folders/{path}:
+    delete:
+      tags: [Files]
+      summary: Delete folder
+      description: Deletes a folder and all its contents recursively.
+      parameters:
+        - name: space
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          example: journal/2026
+      responses:
+        '200':
+          description: Folder deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: integer
+                    description: Number of rows deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ── Data: Search ──────────────────────────────────────
+  /data/{space}/search:
+    get:
+      tags: [Search]
+      summary: Full-text search
+      description: Searches file content using Postgres full-text search. Results filtered by permissions.
+      parameters:
+        - name: space
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+          example: shipped MVP
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SearchResult'
+
+  # ── Admin: Spaces ─────────────────────────────────────
+  /admin/spaces:
+    get:
+      tags: [Admin]
+      summary: List spaces
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Space'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Admin]
+      summary: Create space
+      description: Creates a new space with a Postgres connection. Tests the connection before creating.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type, database_url]
+              properties:
+                name:
+                  type: string
+                  pattern: ^[a-z][a-z0-9_]{0,49}$
+                  example: notes
+                type:
+                  type: string
+                  enum: [postgres]
+                database_url:
+                  type: string
+                  example: postgresql://user:pass@host:5432/dbname
+      responses:
+        '201':
+          description: Space created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Space'
+        '400':
+          description: Invalid name or connection failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/spaces/{space}:
+    delete:
+      tags: [Admin]
+      summary: Delete space
+      description: Drops the Postgres table and removes all config.
+      parameters:
+        - name: space
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Space deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: string
+
+  /admin/spaces/{space}/permissions:
+    get:
+      tags: [Admin]
+      summary: Get space permissions
+      parameters:
+        - name: space
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SpacePermissionEntry'
+
+    put:
+      tags: [Admin]
+      summary: Update space permissions
+      description: Replaces the entire permissions list for a space.
+      parameters:
+        - name: space
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/SpacePermissionEntry'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SpacePermissionEntry'
+
+  # ── Admin: Users ──────────────────────────────────────
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: List users
+      description: Returns all users. API keys are omitted.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserInfo'
+
+    post:
+      tags: [Admin]
+      summary: Create user
+      description: |
+        Creates a new user with an auto-generated API key.
+        The API key is returned **only in this response** — it cannot be retrieved later.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: journal-bot
+      responses:
+        '201':
+          description: User created (includes API key)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserWithKey'
+
+  /admin/users/{id}:
+    get:
+      tags: [Admin]
+      summary: Get user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfo'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Admin]
+      summary: Delete user
+      description: Cannot delete the admin user.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: string
+                    format: uuid
+        '400':
+          description: Cannot delete admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+tags:
+  - name: Auth
+    description: API key verification
+  - name: Files
+    description: Read, write, append, delete files and folders
+  - name: Search
+    description: Full-text search across files
+  - name: Admin
+    description: Space, user, and permission management (admin only)
