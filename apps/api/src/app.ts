@@ -1,6 +1,5 @@
 import express from 'express';
 import path from 'node:path';
-import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { errorHandler } from './middleware/error-handler.js';
 import { authRouter } from './routes/auth.js';
@@ -14,7 +13,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '../../../');
 
 function baseUrl(req: express.Request): string {
-  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  const fwd = req.headers['x-forwarded-proto'];
+  const proto = (Array.isArray(fwd) ? fwd[0] : fwd?.split(',')[0]?.trim()) || req.protocol;
   const host = req.headers.host || 'localhost';
   return `${proto}://${host}`;
 }
@@ -98,15 +98,15 @@ JSON: { "error": "message", "status": 404 }
 
   // Serve repo-root docs
   app.get('/agents.md', (_req, res) => {
-    const file = path.join(repoRoot, 'AGENTS.md');
-    if (fs.existsSync(file)) return res.type('text/markdown').sendFile(file);
-    res.status(404).json({ error: 'Not found', status: 404 });
+    res.type('text/markdown').sendFile(path.join(repoRoot, 'AGENTS.md'), (err) => {
+      if (err) res.status(404).json({ error: 'Not found', status: 404 });
+    });
   });
 
   app.get('/openapi.yaml', (_req, res) => {
-    const file = path.join(repoRoot, 'openapi.yaml');
-    if (fs.existsSync(file)) return res.type('text/yaml').sendFile(file);
-    res.status(404).json({ error: 'Not found', status: 404 });
+    res.type('text/yaml').sendFile(path.join(repoRoot, 'openapi.yaml'), (err) => {
+      if (err) res.status(404).json({ error: 'Not found', status: 404 });
+    });
   });
 
   // ── API Routes ───────────────────────────────────────
