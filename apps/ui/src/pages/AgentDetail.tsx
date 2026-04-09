@@ -23,6 +23,26 @@ export function AgentDetail() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
+  const startPolling = () => {
+    let pollCount = 0;
+    const maxPolls = 200;
+    pollRef.current = setInterval(async () => {
+      pollCount++;
+      try {
+        const data = await apiGet<AgentWithRunning>(`/admin/agents/${name}`);
+        if (!data.running || pollCount >= maxPolls) {
+          setRunning(false);
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
+        }
+      } catch {
+        setRunning(false);
+        clearInterval(pollRef.current!);
+        pollRef.current = null;
+      }
+    }, 3000);
+  };
+
   useEffect(() => {
     apiGet<AgentWithRunning>(`/admin/agents/${name}`).then(data => {
       setAgent(data);
@@ -31,6 +51,7 @@ export function AgentDetail() {
       setModel(data.model || '');
       setEnabled(data.enabled);
       setRunning(data.running || false);
+      if (data.running) startPolling();
     });
   }, [name]);
 
@@ -46,23 +67,7 @@ export function AgentDetail() {
     setRunning(true);
     try {
       await apiPost(`/admin/agents/${name}/run`);
-      let pollCount = 0;
-      const maxPolls = 200; // ~10 min at 3s intervals
-      pollRef.current = setInterval(async () => {
-        pollCount++;
-        try {
-          const data = await apiGet<AgentWithRunning>(`/admin/agents/${name}`);
-          if (!data.running || pollCount >= maxPolls) {
-            setRunning(false);
-            clearInterval(pollRef.current!);
-            pollRef.current = null;
-          }
-        } catch {
-          setRunning(false);
-          clearInterval(pollRef.current!);
-          pollRef.current = null;
-        }
-      }, 3000);
+      startPolling();
     } catch {
       setRunning(false);
     }

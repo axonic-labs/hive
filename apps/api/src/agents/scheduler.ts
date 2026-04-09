@@ -24,7 +24,7 @@ function scheduleAgent(name: string, schedule: string): void {
   const task = cron.schedule(schedule, () => {
     console.log(`Cron firing agent: ${name}`);
     executeAgent(name).catch(err => {
-      console.error(`Agent "${name}" cron execution failed:`, err.message);
+      console.error(`Agent "${name}" cron execution failed:`, err instanceof Error ? err.message : String(err));
     });
   });
   tasks.set(name, task);

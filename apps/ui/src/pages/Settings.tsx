@@ -1,11 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiGet, apiPut } from '../api/client';
-
-interface LLMConfig {
-  provider: string;
-  api_key: string;
-  default_model: string;
-}
+import type { LLMConfig } from '@hive/shared';
 
 export function Settings() {
   const [provider, setProvider] = useState('anthropic');
