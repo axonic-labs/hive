@@ -22,7 +22,7 @@ Working system deployed to Railway at hive.yaneq.com. Superuser can log in, crea
 │  ├── /api/auth/verify      Auth (all users)   │
 │  ├── /api/admin/spaces     Space mgmt (admin) │
 │  ├── /api/admin/users      User mgmt (admin)  │
-│  └── /api/data/:space/*    File CRUD + search │
+│  └── /api/data/:space/*    File CRUD + search │  ← see openapi.yaml for full routes
 ├───────────────────────────────────────────────┤
 │  Auth: unified API key (Bearer token)         │
 │  Permissions: per-space JSON files at /data   │
@@ -62,7 +62,7 @@ hive/
 - **Folders as `.keep` markers** — folders are rows with `filename='.keep'` in the space table. No empty folder without a marker.
 - **Recursive prefix permissions** — granting `journal/` covers everything under it.
 - **Filtered listings** — non-admin users only see files they have permission to access.
-- **Server-side append** — PATCH endpoint auto-newlines and creates-if-missing.
+- **Server-side append** — PATCH endpoint prepends a newline separator before appended content, and creates the file if missing.
 - **content_hash** — SHA-256 stored on every write for future bidirectional sync.
 
 ## /data directory layout (Railway volume)
@@ -82,6 +82,7 @@ Express 5 uses path-to-regexp v8 which requires **named wildcards**. Use `*path`
 ## Dev workflow
 ```bash
 pnpm install
+pnpm --filter @hive/shared build                       # required on first run
 ADMIN_API_KEY=test-key DATA_DIR=./data pnpm run dev   # single server, Vite HMR
 pnpm run build                                         # shared → ui → api
 ```
