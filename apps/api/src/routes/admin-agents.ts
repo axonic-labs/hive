@@ -135,7 +135,7 @@ adminAgentsRouter.post('/:name/run', (req, res, next) => {
 
     // Fire and forget
     executeAgent(name).catch(err => {
-      console.error(`Manual run of agent "${name}" failed:`, err.message);
+      console.error(`Manual run of agent "${name}" failed:`, err instanceof Error ? err.message : String(err));
     });
 
     res.json({ status: 'started', agent: name });

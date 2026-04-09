@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiGet, apiPost, apiDelete } from '../api/client';
 import type { AgentConfig } from '@hive/shared';
@@ -25,6 +25,7 @@ export function Agents() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
   const [runningAgents, setRunningAgents] = useState<Set<string>>(new Set());
+  const pollRefs = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   const navigate = useNavigate();
 
   const load = async () => {
@@ -40,7 +41,10 @@ export function Agents() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    return () => { pollRefs.current.forEach(id => clearInterval(id)); };
+  }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,25 +64,32 @@ export function Agents() {
     }
   };
 
+  const stopPolling = (agentName: string) => {
+    const id = pollRefs.current.get(agentName);
+    if (id) { clearInterval(id); pollRefs.current.delete(agentName); }
+    setRunningAgents(prev => { const s = new Set(prev); s.delete(agentName); return s; });
+  };
+
   const handleRun = async (agentName: string) => {
     setRunningAgents(prev => new Set(prev).add(agentName));
     try {
       await apiPost(`/admin/agents/${agentName}/run`);
-      // Poll until agent finishes
+      let pollCount = 0;
+      const maxPolls = 200; // ~10 min at 3s intervals
       const poll = setInterval(async () => {
+        pollCount++;
         try {
           const data = await apiGet<AgentWithExtras>(`/admin/agents/${agentName}`);
-          if (!data.running) {
-            setRunningAgents(prev => { const s = new Set(prev); s.delete(agentName); return s; });
-            clearInterval(poll);
+          if (!data.running || pollCount >= maxPolls) {
+            stopPolling(agentName);
           }
         } catch {
-          setRunningAgents(prev => { const s = new Set(prev); s.delete(agentName); return s; });
-          clearInterval(poll);
+          stopPolling(agentName);
         }
       }, 3000);
+      pollRefs.current.set(agentName, poll);
     } catch {
-      setRunningAgents(prev => { const s = new Set(prev); s.delete(agentName); return s; });
+      stopPolling(agentName);
     }
   };
 

@@ -70,17 +70,18 @@ export async function executeAgent(name: string): Promise<AgentRunSummary> {
       }, config.timeout_ms);
     });
 
-    const result = await Promise.race([
-      generateText({
-        model,
-        system: config.prompt,
-        messages: [{ role: 'user' as const, content: 'Run your task now.' }],
-        tools: tools as unknown as ToolSet,
-        stopWhen: stepCountIs(25),
-        abortSignal: abortController.signal,
-      }),
-      timeoutPromise,
-    ]);
+    const generateTextPromise = generateText({
+      model,
+      system: config.prompt,
+      messages: [{ role: 'user' as const, content: 'Run your task now.' }],
+      tools: tools as unknown as ToolSet,
+      stopWhen: stepCountIs(25),
+      abortSignal: abortController.signal,
+    });
+    // Silence orphaned AbortError when timeout wins the race
+    generateTextPromise.catch(() => {});
+
+    const result = await Promise.race([generateTextPromise, timeoutPromise]);
 
     const text = result.text || '(no text output)';
     const stepCount = result.steps?.length ?? 0;

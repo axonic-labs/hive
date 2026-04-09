@@ -23,8 +23,8 @@ export interface SpacePermissionEntry {
 }
 
 export interface SpaceConfig {
-  type: 'postgres';
-  database_url: string;
+  type: 'filesystem' | 'postgres';
+  database_url?: string;
   schema?: 'files' | 'chatlog';
 }
 

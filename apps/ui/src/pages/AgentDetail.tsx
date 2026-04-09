@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiGet, apiPut, apiPost } from '../api/client';
 import type { AgentConfig } from '@hive/shared';
@@ -17,6 +17,11 @@ export function AgentDetail() {
   const [enabled, setEnabled] = useState(true);
   const [saved, setSaved] = useState(false);
   const [running, setRunning] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
 
   useEffect(() => {
     apiGet<AgentWithRunning>(`/admin/agents/${name}`).then(data => {
@@ -41,17 +46,21 @@ export function AgentDetail() {
     setRunning(true);
     try {
       await apiPost(`/admin/agents/${name}/run`);
-      // Poll until agent finishes
-      const poll = setInterval(async () => {
+      let pollCount = 0;
+      const maxPolls = 200; // ~10 min at 3s intervals
+      pollRef.current = setInterval(async () => {
+        pollCount++;
         try {
           const data = await apiGet<AgentWithRunning>(`/admin/agents/${name}`);
-          if (!data.running) {
+          if (!data.running || pollCount >= maxPolls) {
             setRunning(false);
-            clearInterval(poll);
+            clearInterval(pollRef.current!);
+            pollRef.current = null;
           }
         } catch {
           setRunning(false);
-          clearInterval(poll);
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
         }
       }, 3000);
     } catch {
