@@ -15,7 +15,10 @@ const repoRoot = path.resolve(__dirname, '../../../');
 function baseUrl(req: express.Request): string {
   const fwd = req.headers['x-forwarded-proto'];
   const proto = (Array.isArray(fwd) ? fwd[0] : fwd?.split(',')[0]?.trim()) || req.protocol;
-  const host = req.headers.host || 'localhost';
+  const fwdHost = req.headers['x-forwarded-host'];
+  const host = (Array.isArray(fwdHost) ? fwdHost[0] : fwdHost?.split(',')[0]?.trim())
+    || req.headers.host
+    || 'localhost';
   return `${proto}://${host}`;
 }
 
