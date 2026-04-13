@@ -59,12 +59,13 @@ export async function executeAgent(name: string): Promise<AgentRunSummary> {
   const threadName = `${config.log_thread_prefix}/${startedAt.toISOString().slice(0, 10)}`;
 
   let status: 'success' | 'error' | 'timeout' = 'success';
+  let timeoutId: ReturnType<typeof setTimeout>;
 
   try {
     await logToThread(baseUrl, user.api_key, config.log_space, threadName, name, `▶ Agent run started`);
 
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         abortController.abort();
         reject(new Error('timeout'));
       }, config.timeout_ms);
@@ -96,6 +97,7 @@ export async function executeAgent(name: string): Promise<AgentRunSummary> {
       `✗ ${status}: ${msg}`);
     console.error(`Agent "${name}" ${status}:`, msg);
   } finally {
+    clearTimeout(timeoutId!);
     runningAgents.delete(name);
   }
 

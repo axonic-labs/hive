@@ -28,6 +28,30 @@ export function Agents() {
   const pollRefs = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   const navigate = useNavigate();
 
+  const stopPolling = (agentName: string) => {
+    const id = pollRefs.current.get(agentName);
+    if (id) { clearInterval(id); pollRefs.current.delete(agentName); }
+    setRunningAgents(prev => { const s = new Set(prev); s.delete(agentName); return s; });
+  };
+
+  const startPolling = (agentName: string) => {
+    if (pollRefs.current.has(agentName)) return;
+    let pollCount = 0;
+    const maxPolls = 200;
+    const poll = setInterval(async () => {
+      pollCount++;
+      try {
+        const data = await apiGet<AgentWithExtras>(`/admin/agents/${agentName}`);
+        if (!data.running || pollCount >= maxPolls) {
+          stopPolling(agentName);
+        }
+      } catch {
+        stopPolling(agentName);
+      }
+    }, 3000);
+    pollRefs.current.set(agentName, poll);
+  };
+
   const load = async () => {
     const [data, spaceData] = await Promise.all([
       apiGet<AgentWithExtras[]>('/admin/agents'),
@@ -35,6 +59,10 @@ export function Agents() {
     ]);
     setAgents(data);
     setSpaces(spaceData);
+    // Sync running state from server
+    const running = new Set(data.filter(a => a.running).map(a => a.name));
+    setRunningAgents(running);
+    running.forEach(agentName => startPolling(agentName));
     if (!logSpace && spaceData.length > 0) {
       const chatlog = spaceData.find(s => s.schema === 'chatlog');
       setLogSpace(chatlog?.name || spaceData[0].name);
@@ -64,30 +92,11 @@ export function Agents() {
     }
   };
 
-  const stopPolling = (agentName: string) => {
-    const id = pollRefs.current.get(agentName);
-    if (id) { clearInterval(id); pollRefs.current.delete(agentName); }
-    setRunningAgents(prev => { const s = new Set(prev); s.delete(agentName); return s; });
-  };
-
   const handleRun = async (agentName: string) => {
     setRunningAgents(prev => new Set(prev).add(agentName));
     try {
       await apiPost(`/admin/agents/${agentName}/run`);
-      let pollCount = 0;
-      const maxPolls = 200; // ~10 min at 3s intervals
-      const poll = setInterval(async () => {
-        pollCount++;
-        try {
-          const data = await apiGet<AgentWithExtras>(`/admin/agents/${agentName}`);
-          if (!data.running || pollCount >= maxPolls) {
-            stopPolling(agentName);
-          }
-        } catch {
-          stopPolling(agentName);
-        }
-      }, 3000);
-      pollRefs.current.set(agentName, poll);
+      startPolling(agentName);
     } catch {
       stopPolling(agentName);
     }

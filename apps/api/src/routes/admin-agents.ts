@@ -14,7 +14,7 @@ export const adminAgentsRouter = Router();
 
 // List agents
 adminAgentsRouter.get('/', (_req, res) => {
-  res.json(listAgentConfigs());
+  res.json(listAgentConfigs().map(a => ({ ...a, running: isAgentRunning(a.name) })));
 });
 
 // Create agent
