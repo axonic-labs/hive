@@ -26,3 +26,23 @@ Hive is an open-source personal cloud. Your domain = your identity = your cloud.
 - This is a personal tool first, designed for future standardization
 - Read requirements.md before implementing anything
 - Keep it simple — the #1 lesson from 14 failed predecessors is: ship first, standardize later
+
+## Before implementing any task
+
+Sanity-check the request before writing code:
+
+| Check | Ask yourself |
+|-------|-------------|
+| **Product value** | Does this actually improve the experience, or is it an edge case that doesn't justify the complexity? |
+| **Architecture fit** | Does it fit cleanly in the 7-layer architecture? Or does it need hacks? |
+| **Scope creep** | Does it sound simple but actually imply a much larger change? |
+| **Better alternative** | Is there a simpler way to solve the underlying problem? |
+| **MVP alignment** | Does this fit MVP scope, or is it premature complexity? |
+
+If concerns arise, raise them before starting. For complex tasks (new schema, new endpoints, cross-layer changes, vague requirements), interview the user to build a plan before implementing.
+
+## Git workflow
+- Branch from `main`, prefix: `yaneq/`
+- Use `pnpm` (never `npm`)
+- Build before PR: `pnpm run build`
+- Use `/create-pr` skill when code is ready — it handles build, review, push, PR creation, and @claude review request
