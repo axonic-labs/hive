@@ -22,13 +22,25 @@ export interface SpacePermissionEntry {
   grants: PermissionGrant[];
 }
 
-export interface SpaceConfig {
-  type: 'postgres';
+export interface PostgresFilesSpaceConfig {
+  kind: 'files';
+  provider: 'postgres';
   database_url: string;
 }
 
+export interface GitFilesSpaceConfig {
+  kind: 'files';
+  provider: 'git';
+  remote_url?: string;
+  remote_branch?: string;
+}
+
+export type SpaceConfig = PostgresFilesSpaceConfig | GitFilesSpaceConfig;
+
 export interface SpaceMeta {
   name: string;
+  kind: SpaceConfig['kind'];
+  provider: SpaceConfig['provider'];
 }
 
 export interface FileEntry {

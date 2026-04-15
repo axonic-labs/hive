@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
-import type { User, SpaceConfig, SpacePermissionEntry } from '@hive/shared';
+import type { User, SpaceConfig, SpaceMeta, SpacePermissionEntry } from '@hive/shared';
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
 
@@ -58,9 +58,13 @@ export function initSuperuser(): void {
 
 // Spaces
 
-const spacesDir = () => path.join(DATA_DIR, 'spaces');
+export const spacesDir = () => path.join(DATA_DIR, 'spaces');
 
-export function listSpaces(): string[] {
+export function spaceRepoDir(space: string): string {
+  return path.join(spacesDir(), space, 'repo');
+}
+
+export function listSpaceNames(): string[] {
   const dir = spacesDir();
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir).filter(f =>
@@ -68,10 +72,30 @@ export function listSpaces(): string[] {
   );
 }
 
+export function listSpaces(): SpaceMeta[] {
+  return listSpaceNames().map(name => {
+    const config = getSpaceConfig(name);
+    return {
+      name,
+      kind: config?.kind ?? 'files',
+      provider: config?.provider ?? 'postgres',
+    };
+  });
+}
+
 export function getSpaceConfig(space: string): SpaceConfig | null {
   const file = path.join(spacesDir(), space, 'config.json');
   if (!fs.existsSync(file)) return null;
-  return JSON.parse(fs.readFileSync(file, 'utf-8'));
+  const raw = JSON.parse(fs.readFileSync(file, 'utf-8'));
+
+  // Migrate old { type: 'postgres', database_url } format
+  if (raw.type && !raw.kind) {
+    const migrated: SpaceConfig = { kind: 'files', provider: raw.type, database_url: raw.database_url };
+    fs.writeFileSync(file, JSON.stringify(migrated, null, 2));
+    return migrated;
+  }
+
+  return raw;
 }
 
 export function saveSpaceConfig(space: string, config: SpaceConfig): void {

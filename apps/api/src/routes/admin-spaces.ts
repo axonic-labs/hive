@@ -1,41 +1,60 @@
 import { Router } from 'express';
-import { listSpaces, saveSpaceConfig, deleteSpaceDir, getSpacePermissions, saveSpacePermissions, getSpaceConfig } from '../config/manager.js';
+import git from 'isomorphic-git';
+import fs from 'node:fs';
+import { listSpaces, saveSpaceConfig, deleteSpaceDir, getSpacePermissions, saveSpacePermissions, getSpaceConfig, spaceRepoDir } from '../config/manager.js';
 import { validateSpaceName, createSpaceTable, dropSpaceTable } from '../db/spaces.js';
 import { getPool, removePool, testConnection } from '../db/pools.js';
+import { removeProvider } from '../providers/resolve.js';
 import { badRequest, notFound } from '../middleware/error-handler.js';
 
 export const adminSpacesRouter = Router();
 
 adminSpacesRouter.get('/', (_req, res) => {
-  const spaces = listSpaces().map(name => ({ name }));
-  res.json(spaces);
+  res.json(listSpaces());
 });
 
 adminSpacesRouter.post('/', async (req, res, next) => {
   try {
-    const { name, type, database_url } = req.body;
+    const { name, kind, provider, database_url, remote_url, remote_branch } = req.body;
 
     if (!name || !validateSpaceName(name)) {
       throw badRequest('Invalid space name. Use lowercase letters, numbers, underscores. Must start with a letter. Max 50 chars.');
     }
-    if (type !== 'postgres') {
-      throw badRequest('Only "postgres" type is supported');
+
+    const spaceKind = kind || 'files';
+    const spaceProvider = provider || req.body.type || 'postgres';
+
+    if (spaceKind !== 'files') {
+      throw badRequest('Only "files" kind is currently supported');
     }
-    if (!database_url) {
-      throw badRequest('database_url is required');
+    if (spaceProvider !== 'postgres' && spaceProvider !== 'git') {
+      throw badRequest('Provider must be "postgres" or "git"');
     }
 
-    const connError = await testConnection(database_url);
-    if (connError) {
-      throw badRequest(`Could not connect: ${connError}`);
+    if (spaceProvider === 'postgres') {
+      if (!database_url) throw badRequest('database_url is required for postgres provider');
+
+      const connError = await testConnection(database_url);
+      if (connError) throw badRequest(`Could not connect: ${connError}`);
+
+      saveSpaceConfig(name, { kind: 'files', provider: 'postgres', database_url });
+
+      const pool = getPool(name);
+      await createSpaceTable(pool, name);
+    } else {
+      // Git provider
+      const config: Record<string, string> = { kind: 'files', provider: 'git' };
+      if (remote_url) config.remote_url = remote_url;
+      if (remote_branch) config.remote_branch = remote_branch;
+      saveSpaceConfig(name, config as any);
+
+      // Init git repo
+      const dir = spaceRepoDir(name);
+      fs.mkdirSync(dir, { recursive: true });
+      await git.init({ fs, dir });
     }
 
-    saveSpaceConfig(name, { type, database_url });
-
-    const pool = getPool(name);
-    await createSpaceTable(pool, name);
-
-    res.status(201).json({ name, type });
+    res.status(201).json({ name, kind: spaceKind, provider: spaceProvider });
   } catch (err) {
     next(err);
   }
@@ -47,14 +66,17 @@ adminSpacesRouter.delete('/:space', async (req, res, next) => {
     const config = getSpaceConfig(space);
     if (!config) throw notFound(`Space "${space}" not found`);
 
-    try {
-      const pool = getPool(space);
-      await dropSpaceTable(pool, space);
-    } catch {
-      // Table may not exist, continue with cleanup
+    if (config.provider === 'postgres') {
+      try {
+        const pool = getPool(space);
+        await dropSpaceTable(pool, space);
+      } catch {
+        // Table may not exist, continue with cleanup
+      }
+      await removePool(space);
     }
 
-    await removePool(space);
+    removeProvider(space);
     deleteSpaceDir(space);
 
     res.json({ deleted: space });

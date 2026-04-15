@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { getSpaceConfig } from '../config/manager.js';
-import { getPool } from '../db/pools.js';
-import { listFiles, readFile, createFile, writeFile, appendFile, deleteFile, deleteFolder, parseFilePath } from '../db/files.js';
-import { searchFiles } from '../db/search.js';
+import { getProvider } from '../providers/resolve.js';
+import { parseFilePath } from '../db/files.js';
 import { checkPermission, getPermittedPrefixes } from '../middleware/permissions.js';
 import { notFound, badRequest } from '../middleware/error-handler.js';
+import type { FileVersion } from '../providers/types.js';
 
 export const dataRouter = Router();
 
@@ -29,8 +29,8 @@ dataRouter.get('/:space/files', async (req, res, next) => {
       return;
     }
 
-    const pool = getPool(space);
-    const files = await listFiles(pool, space, prefix, prefixes);
+    const provider = getProvider(space);
+    const files = await provider.listFiles(prefix, prefixes);
     res.json(files);
   } catch (err) {
     next(err);
@@ -47,9 +47,9 @@ dataRouter.post('/:space/files', checkPermission('read_write'), async (req, res,
     if (!filename || typeof filename !== 'string') throw badRequest('filename is required');
     if (typeof content !== 'string') throw badRequest('content must be a string');
 
-    const pool = getPool(space);
+    const provider = getProvider(space);
     try {
-      const file = await createFile(pool, space, filePath || '', filename, content);
+      const file = await provider.createFile(filePath || '', filename, content);
       res.status(201).json(file);
     } catch (err) {
       if (err instanceof Error && err.message.includes('already exists')) {
@@ -69,8 +69,8 @@ dataRouter.get('/:space/files/*path', checkPermission('read'), async (req, res, 
     requireSpace(space);
     const { path: filePath, filename } = parseFilePath(param(req.params.path));
 
-    const pool = getPool(space);
-    const file = await readFile(pool, space, filePath, filename);
+    const provider = getProvider(space);
+    const file = await provider.readFile(filePath, filename);
     if (!file) throw notFound('File not found');
 
     if (file.content_text !== null) {
@@ -95,8 +95,8 @@ dataRouter.put('/:space/files/*path', checkPermission('read_write'), async (req,
 
     if (typeof content !== 'string') throw badRequest('Content must be provided as text body or { content: string }');
 
-    const pool = getPool(space);
-    const file = await writeFile(pool, space, filePath, filename, content);
+    const provider = getProvider(space);
+    const file = await provider.writeFile(filePath, filename, content);
     res.json(file);
   } catch (err) {
     next(err);
@@ -113,8 +113,8 @@ dataRouter.patch('/:space/files/*path', checkPermission('read_write'), async (re
 
     if (typeof content !== 'string') throw badRequest('{ content: string } is required');
 
-    const pool = getPool(space);
-    const file = await appendFile(pool, space, filePath, filename, content);
+    const provider = getProvider(space);
+    const file = await provider.appendFile(filePath, filename, content);
     res.json(file);
   } catch (err) {
     next(err);
@@ -128,8 +128,8 @@ dataRouter.delete('/:space/files/*path', checkPermission('read_write'), async (r
     requireSpace(space);
     const { path: filePath, filename } = parseFilePath(param(req.params.path));
 
-    const pool = getPool(space);
-    const deleted = await deleteFile(pool, space, filePath, filename);
+    const provider = getProvider(space);
+    const deleted = await provider.deleteFile(filePath, filename);
     if (!deleted) throw notFound('File not found');
     res.json({ deleted: true });
   } catch (err) {
@@ -144,8 +144,8 @@ dataRouter.delete('/:space/folders/*path', checkPermission('read_write'), async 
     requireSpace(space);
     const folderPath = param(req.params.path);
 
-    const pool = getPool(space);
-    const count = await deleteFolder(pool, space, folderPath);
+    const provider = getProvider(space);
+    const count = await provider.deleteFolder(folderPath);
     res.json({ deleted: count });
   } catch (err) {
     next(err);
@@ -166,9 +166,116 @@ dataRouter.get('/:space/search', async (req, res, next) => {
       return;
     }
 
-    const pool = getPool(space);
-    const results = await searchFiles(pool, space, q, prefixes);
+    const provider = getProvider(space);
+    const results = await provider.searchFiles(q, prefixes);
     res.json(results);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Version history endpoints (git-only) ---
+
+// List file history
+dataRouter.get('/:space/history/*path', checkPermission('read'), async (req, res, next) => {
+  try {
+    const space = param(req.params.space);
+    requireSpace(space);
+    const provider = getProvider(space);
+    if (!provider.capabilities.history) {
+      throw notFound('Version history is not available for this space type');
+    }
+
+    const fullPath = param(req.params.path);
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+
+    // Access getFileHistory via the git provider
+    const gitProvider = provider as any;
+    const history: FileVersion[] = await gitProvider.getFileHistory(fullPath, limit);
+    res.json(history);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Read file at specific version
+dataRouter.get('/:space/versions/:oid/*path', checkPermission('read'), async (req, res, next) => {
+  try {
+    const space = param(req.params.space);
+    requireSpace(space);
+    const provider = getProvider(space);
+    if (!provider.capabilities.history) {
+      throw notFound('Version history is not available for this space type');
+    }
+
+    const oid = req.params.oid;
+    const fullPath = param(req.params.path);
+
+    const gitProvider = provider as any;
+    const content: string | null = await gitProvider.getFileAtVersion(fullPath, oid);
+    if (content === null) throw notFound('File not found at this version');
+
+    res.type('text/plain').send(content);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Diff between two versions
+dataRouter.get('/:space/diff/:oid1/:oid2/*path', checkPermission('read'), async (req, res, next) => {
+  try {
+    const space = param(req.params.space);
+    requireSpace(space);
+    const provider = getProvider(space);
+    if (!provider.capabilities.history) {
+      throw notFound('Version history is not available for this space type');
+    }
+
+    const { oid1, oid2 } = req.params;
+    const fullPath = param(req.params.path);
+
+    const gitProvider = provider as any;
+    const diff = await gitProvider.diffVersions(fullPath, oid1, oid2);
+    res.json(diff);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Restore file to specific version
+dataRouter.post('/:space/restore/:oid/*path', checkPermission('read_write'), async (req, res, next) => {
+  try {
+    const space = param(req.params.space);
+    requireSpace(space);
+    const provider = getProvider(space);
+    if (!provider.capabilities.history) {
+      throw notFound('Version history is not available for this space type');
+    }
+
+    const oid = req.params.oid;
+    const fullPath = param(req.params.path);
+
+    const gitProvider = provider as any;
+    const file = await gitProvider.restoreVersion(fullPath, oid);
+    res.json(file);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Sync (push to remote)
+dataRouter.post('/:space/sync', checkPermission('read_write'), async (req, res, next) => {
+  try {
+    const space = param(req.params.space);
+    requireSpace(space);
+    const provider = getProvider(space);
+    if (!provider.capabilities.remoteSync) {
+      throw notFound('Remote sync is not available for this space');
+    }
+
+    const gitProvider = provider as any;
+    await gitProvider.sync();
+    res.json({ synced: true });
   } catch (err) {
     next(err);
   }
