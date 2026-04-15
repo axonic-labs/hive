@@ -4,7 +4,15 @@ import { getProvider } from '../providers/resolve.js';
 import { parseFilePath } from '../db/files.js';
 import { checkPermission, getPermittedPrefixes } from '../middleware/permissions.js';
 import { notFound, badRequest } from '../middleware/error-handler.js';
-import type { FileVersion } from '../providers/types.js';
+import type { FileProvider, FileVersion } from '../providers/types.js';
+import type { GitFileProvider } from '../providers/git/index.js';
+
+function asGitProvider(provider: FileProvider): GitFileProvider {
+  if (!provider.capabilities.history) {
+    throw notFound('Version history is not available for this space type');
+  }
+  return provider as GitFileProvider;
+}
 
 import { chatDataRouter } from './chat-data.js';
 
@@ -195,16 +203,11 @@ dataRouter.get('/:space/history/*path', checkPermission('read'), async (req, res
   try {
     const space = param(req.params.space);
     requireSpace(space);
-    const provider = getProvider(space);
-    if (!provider.capabilities.history) {
-      throw notFound('Version history is not available for this space type');
-    }
+    const gitProvider = asGitProvider(getProvider(space));
 
     const fullPath = param(req.params.path);
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
 
-    // Access getFileHistory via the git provider
-    const gitProvider = provider as any;
     const history: FileVersion[] = await gitProvider.getFileHistory(fullPath, limit);
     res.json(history);
   } catch (err) {
@@ -217,15 +220,11 @@ dataRouter.get('/:space/versions/:oid/*path', checkPermission('read'), async (re
   try {
     const space = param(req.params.space);
     requireSpace(space);
-    const provider = getProvider(space);
-    if (!provider.capabilities.history) {
-      throw notFound('Version history is not available for this space type');
-    }
+    const gitProvider = asGitProvider(getProvider(space));
 
-    const oid = req.params.oid;
+    const oid = param(req.params.oid);
     const fullPath = param(req.params.path);
 
-    const gitProvider = provider as any;
     const content: string | null = await gitProvider.getFileAtVersion(fullPath, oid);
     if (content === null) throw notFound('File not found at this version');
 
@@ -240,15 +239,12 @@ dataRouter.get('/:space/diff/:oid1/:oid2/*path', checkPermission('read'), async 
   try {
     const space = param(req.params.space);
     requireSpace(space);
-    const provider = getProvider(space);
-    if (!provider.capabilities.history) {
-      throw notFound('Version history is not available for this space type');
-    }
+    const gitProvider = asGitProvider(getProvider(space));
 
-    const { oid1, oid2 } = req.params;
+    const oid1 = param(req.params.oid1);
+    const oid2 = param(req.params.oid2);
     const fullPath = param(req.params.path);
 
-    const gitProvider = provider as any;
     const diff = await gitProvider.diffVersions(fullPath, oid1, oid2);
     res.json(diff);
   } catch (err) {
@@ -261,15 +257,11 @@ dataRouter.post('/:space/restore/:oid/*path', checkPermission('read_write'), asy
   try {
     const space = param(req.params.space);
     requireSpace(space);
-    const provider = getProvider(space);
-    if (!provider.capabilities.history) {
-      throw notFound('Version history is not available for this space type');
-    }
+    const gitProvider = asGitProvider(getProvider(space));
 
-    const oid = req.params.oid;
+    const oid = param(req.params.oid);
     const fullPath = param(req.params.path);
 
-    const gitProvider = provider as any;
     const file = await gitProvider.restoreVersion(fullPath, oid);
     res.json(file);
   } catch (err) {
@@ -287,7 +279,7 @@ dataRouter.post('/:space/sync', checkPermission('read_write'), async (req, res, 
       throw notFound('Remote sync is not available for this space');
     }
 
-    const gitProvider = provider as any;
+    const gitProvider = provider as GitFileProvider;
     await gitProvider.sync();
     res.json({ synced: true });
   } catch (err) {

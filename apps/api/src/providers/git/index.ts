@@ -56,15 +56,26 @@ export class GitFileProvider implements FileProvider {
     };
   }
 
-  private fullPath(filePath: string, filename: string): string {
-    return filePath ? path.join(this.dir, filePath, filename) : path.join(this.dir, filename);
+  private safePath(filePath: string, filename: string): string {
+    const rel = filePath ? `${filePath}/${filename}` : filename;
+    const normalized = path.normalize(rel);
+    if (normalized.startsWith('..') || path.isAbsolute(normalized)) {
+      throw new Error('Invalid path');
+    }
+    return path.join(this.dir, normalized);
   }
 
   private relativePath(filePath: string, filename: string): string {
-    return filePath ? `${filePath}/${filename}` : filename;
+    const rel = filePath ? `${filePath}/${filename}` : filename;
+    const normalized = path.normalize(rel);
+    if (normalized.startsWith('..') || path.isAbsolute(normalized)) {
+      throw new Error('Invalid path');
+    }
+    return normalized;
   }
 
   private fileEntry(filePath: string, filename: string, content: string, stat: fs.Stats): FileEntry {
+    // Use mtime for both — birthtime is unreliable on Linux (ext4 returns epoch)
     return {
       id: deterministicId(this.space, filePath, filename),
       path: filePath,
@@ -72,7 +83,7 @@ export class GitFileProvider implements FileProvider {
       content_text: content,
       content_blob: null,
       content_hash: sha256(content),
-      created_at: stat.birthtime.toISOString(),
+      created_at: stat.mtime.toISOString(),
       updated_at: stat.mtime.toISOString(),
     };
   }
@@ -132,7 +143,7 @@ export class GitFileProvider implements FileProvider {
         return this.matchesPermissions(filePath, filename, perms);
       })
       .map(({ filePath, filename }) => {
-        const full = this.fullPath(filePath, filename);
+        const full = this.safePath(filePath, filename);
         let stat: fs.Stats;
         try {
           // .keep files are virtual, use parent directory stat
@@ -149,14 +160,14 @@ export class GitFileProvider implements FileProvider {
           id: deterministicId(this.space, filePath, filename),
           path: filePath,
           filename,
-          created_at: stat.birthtime.toISOString(),
+          created_at: stat.mtime.toISOString(),
           updated_at: stat.mtime.toISOString(),
         };
       });
   }
 
   async readFile(filePath: string, filename: string): Promise<FileEntry | null> {
-    const full = this.fullPath(filePath, filename);
+    const full = this.safePath(filePath, filename);
     if (!fs.existsSync(full)) return null;
 
     const stat = fs.statSync(full);
@@ -166,7 +177,7 @@ export class GitFileProvider implements FileProvider {
 
   async createFile(filePath: string, filename: string, content: string): Promise<FileEntry> {
     return withLock(this.space, async () => {
-      const full = this.fullPath(filePath, filename);
+      const full = this.safePath(filePath, filename);
       if (fs.existsSync(full)) {
         throw new Error(`File "${filename}" already exists at this path`);
       }
@@ -186,7 +197,7 @@ export class GitFileProvider implements FileProvider {
 
   async writeFile(filePath: string, filename: string, content: string): Promise<FileEntry> {
     return withLock(this.space, async () => {
-      const full = this.fullPath(filePath, filename);
+      const full = this.safePath(filePath, filename);
       const dir = path.dirname(full);
       fs.mkdirSync(dir, { recursive: true });
 
@@ -202,7 +213,7 @@ export class GitFileProvider implements FileProvider {
 
   async appendFile(filePath: string, filename: string, content: string): Promise<FileEntry> {
     return withLock(this.space, async () => {
-      const full = this.fullPath(filePath, filename);
+      const full = this.safePath(filePath, filename);
       let existing = '';
       if (fs.existsSync(full)) {
         existing = fs.readFileSync(full, 'utf-8');
@@ -223,7 +234,7 @@ export class GitFileProvider implements FileProvider {
 
   async deleteFile(filePath: string, filename: string): Promise<boolean> {
     return withLock(this.space, async () => {
-      const full = this.fullPath(filePath, filename);
+      const full = this.safePath(filePath, filename);
       if (!fs.existsSync(full)) return false;
 
       fs.unlinkSync(full);
@@ -255,8 +266,12 @@ export class GitFileProvider implements FileProvider {
       const full = path.join(this.dir, folderPath);
       if (!fs.existsSync(full)) return 0;
 
-      // Collect all files to remove from git
-      const files = this.walkDir(full, folderPath).filter(f => f.filename !== '.keep');
+      // Collect all files under this folder from the repo root walk
+      const allFiles = this.walkDir(this.dir);
+      const files = allFiles.filter(f =>
+        f.filename !== '.keep' &&
+        (f.filePath === folderPath || f.filePath.startsWith(folderPath + '/'))
+      );
       for (const { filePath, filename } of files) {
         try {
           await git.remove({ fs, dir: this.dir, filepath: this.relativePath(filePath, filename) });
@@ -283,7 +298,7 @@ export class GitFileProvider implements FileProvider {
       if (!this.matchesPermissions(filePath, filename, permittedPrefixes)) continue;
       if (!isTextFile(filename)) continue;
 
-      const full = this.fullPath(filePath, filename);
+      const full = this.safePath(filePath, filename);
       try {
         const content = fs.readFileSync(full, 'utf-8');
         const lowerContent = content.toLowerCase();
@@ -304,7 +319,7 @@ export class GitFileProvider implements FileProvider {
           id: deterministicId(this.space, filePath, filename),
           path: filePath,
           filename,
-          created_at: stat.birthtime.toISOString(),
+          created_at: stat.mtime.toISOString(),
           updated_at: stat.mtime.toISOString(),
           headline,
           rank: 1,
@@ -321,7 +336,8 @@ export class GitFileProvider implements FileProvider {
 
   async getFileHistory(fullPath: string, limit: number = 50): Promise<FileVersion[]> {
     try {
-      const commits = await git.log({ fs, dir: this.dir, depth: limit * 2 });
+      // Scan all commits — isomorphic-git doesn't support per-file log filtering
+      const commits = await git.log({ fs, dir: this.dir });
 
       // Filter to commits that touched this file
       const versions: FileVersion[] = [];
