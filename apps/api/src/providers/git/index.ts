@@ -263,7 +263,11 @@ export class GitFileProvider implements FileProvider {
 
   async deleteFolder(folderPath: string): Promise<number> {
     return withLock(this.space, async () => {
-      const full = path.join(this.dir, folderPath);
+      const normalized = path.normalize(folderPath);
+      if (normalized.startsWith('..') || path.isAbsolute(normalized)) {
+        throw new Error('Invalid path');
+      }
+      const full = path.join(this.dir, normalized);
       if (!fs.existsSync(full)) return 0;
 
       // Collect all files under this folder from the repo root walk

@@ -59,6 +59,9 @@ adminSpacesRouter.post('/', async (req, res, next) => {
       const dir = spaceRepoDir(name);
       fs.mkdirSync(dir, { recursive: true });
       await git.init({ fs, dir });
+      if (remote_url) {
+        await git.addRemote({ fs, dir, remote: 'origin', url: remote_url });
+      }
     }
 
     res.status(201).json({ name, kind: spaceKind, provider: spaceProvider });

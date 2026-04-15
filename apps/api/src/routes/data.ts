@@ -6,6 +6,7 @@ import { checkPermission, getPermittedPrefixes } from '../middleware/permissions
 import { notFound, badRequest } from '../middleware/error-handler.js';
 import type { FileProvider, FileVersion } from '../providers/types.js';
 import type { GitFileProvider } from '../providers/git/index.js';
+import { chatDataRouter } from './chat-data.js';
 
 function asGitProvider(provider: FileProvider): GitFileProvider {
   if (!provider.capabilities.history) {
@@ -13,8 +14,6 @@ function asGitProvider(provider: FileProvider): GitFileProvider {
   }
   return provider as GitFileProvider;
 }
-
-import { chatDataRouter } from './chat-data.js';
 
 export const dataRouter = Router();
 
@@ -206,7 +205,7 @@ dataRouter.get('/:space/history/*path', checkPermission('read'), async (req, res
     const gitProvider = asGitProvider(getProvider(space));
 
     const fullPath = param(req.params.path);
-    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string, 10) || 50));
 
     const history: FileVersion[] = await gitProvider.getFileHistory(fullPath, limit);
     res.json(history);
