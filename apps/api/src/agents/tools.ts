@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { listSpaces, getSpaceConfig } from '../config/manager.js';
+import { listSpaceNames, getSpaceConfig } from '../config/manager.js';
 import { getUserGrantsForSpace } from '../middleware/permissions.js';
 
 // Tools map typed loosely to avoid AI SDK generic gymnastics
@@ -10,14 +10,14 @@ export function generateAgentTools(userId: string, baseUrl: string, apiKey: stri
   const tools: Record<string, AnyTool> = {};
   const hdrs = { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
 
-  for (const space of listSpaces()) {
+  for (const space of listSpaceNames()) {
     const grants = getUserGrantsForSpace(userId, space);
     if (grants.length === 0) continue;
 
     const config = getSpaceConfig(space);
     if (!config) continue;
 
-    const schema = config.schema || 'files';
+    const schema = config.kind || 'files';
     const hasWrite = grants.some(g => g.access === 'read_write');
     const p = space.replace(/-/g, '_');
 

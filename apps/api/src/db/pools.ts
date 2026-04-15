@@ -19,8 +19,8 @@ export function getPool(space: string): pg.Pool {
     throw new Error(`No config found for space "${space}"`);
   }
 
-  if (!config.database_url) {
-    throw new Error(`No database_url configured for space "${space}"`);
+  if (config.provider !== 'postgres') {
+    throw new Error(`Space "${space}" is not a postgres space`);
   }
   pool = createPool(config.database_url);
   pools.set(space, pool);

@@ -22,15 +22,31 @@ export interface SpacePermissionEntry {
   grants: PermissionGrant[];
 }
 
-export interface SpaceConfig {
-  type: 'filesystem' | 'postgres';
-  database_url?: string;
-  schema?: 'files' | 'chatlog';
+export interface PostgresFilesSpaceConfig {
+  kind: 'files';
+  provider: 'postgres';
+  database_url: string;
 }
+
+export interface GitFilesSpaceConfig {
+  kind: 'files';
+  provider: 'git';
+  remote_url?: string;
+  remote_branch?: string;
+}
+
+export interface PostgresChatlogSpaceConfig {
+  kind: 'chatlog';
+  provider: 'postgres';
+  database_url: string;
+}
+
+export type SpaceConfig = PostgresFilesSpaceConfig | GitFilesSpaceConfig | PostgresChatlogSpaceConfig;
 
 export interface SpaceMeta {
   name: string;
-  schema: 'files' | 'chatlog';
+  kind: SpaceConfig['kind'];
+  provider: SpaceConfig['provider'];
 }
 
 export interface ChatMessage {
