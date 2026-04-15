@@ -6,7 +6,7 @@ Your domain = your identity = your cloud. Hive is an open-source personal cloud 
 
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/hive)
 
-Set `ADMIN_API_KEY` to any secure string. That's it — spaces default to git-based file storage, no database required.
+Set `ADMIN_API_KEY` to any secure string. Add a Supabase Postgres connection when you create your first space.
 
 ## Run Locally
 
@@ -27,7 +27,7 @@ Open http://localhost:3000 and log in with your admin API key.
 | `DATA_DIR` | No | `/data` | Where config and git-backed files are stored. Use `./data` locally. |
 | `PORT` | No | `3000` | Server port. |
 
-Spaces default to git-based file storage. To use Supabase Postgres for a space, add a database connection when creating the space.
+Each space needs a storage backend. Currently supported: Supabase Postgres (connect when creating a space). Git-based file storage is coming soon.
 
 ## What You Get
 
