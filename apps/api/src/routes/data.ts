@@ -6,6 +6,8 @@ import { checkPermission, getPermittedPrefixes } from '../middleware/permissions
 import { notFound, badRequest } from '../middleware/error-handler.js';
 import type { FileVersion } from '../providers/types.js';
 
+import { chatDataRouter } from './chat-data.js';
+
 export const dataRouter = Router();
 
 function param(val: string | string[] | undefined): string {
@@ -15,6 +17,18 @@ function param(val: string | string[] | undefined): string {
 function requireSpace(space: string) {
   if (!getSpaceConfig(space)) throw notFound(`Space "${space}" not found`);
 }
+
+// Kind-based dispatch: forward chatlog spaces to chat router
+dataRouter.use('/:space', (req, res, next) => {
+  const space = param(req.params.space);
+  const config = getSpaceConfig(space);
+  if (config && config.kind === 'chatlog') {
+    return chatDataRouter(req, res, () => {
+      res.status(404).json({ error: 'Not found', status: 404 });
+    });
+  }
+  next();
+});
 
 // List files
 dataRouter.get('/:space/files', async (req, res, next) => {

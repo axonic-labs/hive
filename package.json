@@ -3,7 +3,10 @@
   "private": true,
   "scripts": {
     "dev": "pnpm --filter @hive/api dev",
+    "dev:chat": "pnpm --filter @hive/chat dev",
     "build": "pnpm --filter @hive/shared build && pnpm --filter @hive/ui build && pnpm --filter @hive/api build",
-    "start": "pnpm --filter @hive/api start"
+    "build:chat": "pnpm --filter @hive/chat build",
+    "start": "pnpm --filter @hive/api start",
+    "start:chat": "pnpm --filter @hive/chat start"
   }
 }

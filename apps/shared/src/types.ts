@@ -35,12 +35,34 @@ export interface GitFilesSpaceConfig {
   remote_branch?: string;
 }
 
-export type SpaceConfig = PostgresFilesSpaceConfig | GitFilesSpaceConfig;
+export interface PostgresChatlogSpaceConfig {
+  kind: 'chatlog';
+  provider: 'postgres';
+  database_url: string;
+}
+
+export type SpaceConfig = PostgresFilesSpaceConfig | GitFilesSpaceConfig | PostgresChatlogSpaceConfig;
 
 export interface SpaceMeta {
   name: string;
   kind: SpaceConfig['kind'];
   provider: SpaceConfig['provider'];
+}
+
+export interface ChatMessage {
+  id: string;
+  thread: string;
+  author: string;
+  source: string | null;
+  content: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface ThreadSummary {
+  thread: string;
+  message_count: number;
+  last_message_at: string;
 }
 
 export interface FileEntry {
@@ -65,4 +87,30 @@ export interface FileListEntry {
 export interface ApiError {
   error: string;
   status: number;
+}
+
+export interface AgentConfig {
+  name: string;
+  user_id: string;
+  schedule: string | null;
+  model: string | null;
+  prompt: string;
+  enabled: boolean;
+  timeout_ms: number;
+  log_space: string;
+  log_thread_prefix: string;
+  created_at: string;
+}
+
+export interface LLMConfig {
+  provider: 'anthropic' | 'openai';
+  api_key: string;
+  default_model: string;
+}
+
+export interface AgentRunSummary {
+  thread: string;
+  started_at: string;
+  status: 'success' | 'error' | 'timeout';
+  duration_ms: number;
 }

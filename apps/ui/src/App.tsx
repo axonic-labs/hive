@@ -5,10 +5,13 @@ import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Login';
 import { Spaces } from './pages/Spaces';
-import { SpaceBrowser } from './pages/SpaceBrowser';
+import { SpaceRouter } from './pages/SpaceRouter';
 import { FileEditor } from './pages/FileEditor';
 import { Users } from './pages/Users';
 import { UserDetail } from './pages/UserDetail';
+import { Agents } from './pages/Agents';
+import { AgentDetail } from './pages/AgentDetail';
+import { Settings } from './pages/Settings';
 
 export function App() {
   const auth = useAuthProvider();
@@ -27,13 +30,22 @@ export function App() {
           }>
             <Route path="/spaces" element={<Spaces />} />
             <Route path="/spaces/:space/edit/*" element={<FileEditor />} />
-            <Route path="/spaces/:space" element={<SpaceBrowser />} />
-            <Route path="/spaces/:space/*" element={<SpaceBrowser />} />
+            <Route path="/spaces/:space" element={<SpaceRouter />} />
+            <Route path="/spaces/:space/*" element={<SpaceRouter />} />
+            <Route path="/agents" element={
+              <ProtectedRoute adminOnly><Agents /></ProtectedRoute>
+            } />
+            <Route path="/agents/:name" element={
+              <ProtectedRoute adminOnly><AgentDetail /></ProtectedRoute>
+            } />
             <Route path="/users" element={
               <ProtectedRoute adminOnly><Users /></ProtectedRoute>
             } />
             <Route path="/users/:id" element={
               <ProtectedRoute adminOnly><UserDetail /></ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute adminOnly><Settings /></ProtectedRoute>
             } />
           </Route>
           <Route path="*" element={<Navigate to="/spaces" replace />} />

@@ -54,7 +54,23 @@
       "Bash(psql $SUPABASE_DB_URL:*)",
       "Bash(psql postgresql://postgres.zrtlvtyacysvmthuxwyb:AWsUROSZti0wvypp@aws-1-us-east-1.pooler.supabase.com:6543/postgres -c 'DELETE FROM hive_notes WHERE path = '\\\\'''\\\\'' AND filename IN \\('\\\\''journal'\\\\'', '\\\\''test'\\\\'', '\\\\''test folder'\\\\''\\) AND content_text IS NULL;')",
       "Bash(psql postgresql://postgres.zrtlvtyacysvmthuxwyb:AWsUROSZti0wvypp@aws-1-us-east-1.pooler.supabase.com:6543/postgres -c 'INSERT INTO hive_notes \\(path, filename\\) VALUES \\('\\\\''journal'\\\\'', '\\\\''.keep'\\\\''\\) ON CONFLICT \\(path, filename\\) DO NOTHING;')",
-      "Bash(psql postgresql://postgres.zrtlvtyacysvmthuxwyb:AWsUROSZti0wvypp@aws-1-us-east-1.pooler.supabase.com:6543/postgres -c 'DELETE FROM hive_notes WHERE path = '\\\\'''\\\\'' AND filename = '\\\\''journal'\\\\'' AND content_text = '\\\\'''\\\\'';')"
+      "Bash(psql postgresql://postgres.zrtlvtyacysvmthuxwyb:AWsUROSZti0wvypp@aws-1-us-east-1.pooler.supabase.com:6543/postgres -c 'DELETE FROM hive_notes WHERE path = '\\\\'''\\\\'' AND filename = '\\\\''journal'\\\\'' AND content_text = '\\\\'''\\\\'';')",
+      "Bash(git reset:*)",
+      "Bash(git rm:*)",
+      "Bash(git checkout:*)",
+      "Bash(gh pr:*)",
+      "Bash(python3 -c ':*)",
+      "Bash(gh api:*)",
+      "Bash(python3 -c \" import sys, json data = json.load\\(sys.stdin\\) for c in data: print\\(f'--- {c[\\\\\"user\\\\\"][\\\\\"login\\\\\"]} on {c.get\\(\\\\\"path\\\\\",\\\\\"\\\\\"\\)}:{c.get\\(\\\\\"line\\\\\",\\\\\"\\\\\"\\)} ---'\\) print\\(c['body']\\) print\\(\\) \")",
+      "Bash(curl -s -X POST https://hive.yaneq.com/api/admin/users -H 'Authorization: Bearer I3U8fG5aKZRCGUfpnBGR' -H 'Content-Type: application/json' -d '{\"name\":\"diary-genie\"}')",
+      "Bash(curl -s https://hive.yaneq.com/api/admin/spaces -H 'Authorization: Bearer I3U8fG5aKZRCGUfpnBGR')",
+      "Bash(curl:*)",
+      "Bash(git stash:*)",
+      "Bash(git rebase:*)",
+      "Bash(git pull:*)",
+      "Bash(cat /Users/jan/projects/hive/node_modules/.pnpm/ai@*/node_modules/ai/package.json)",
+      "Bash(python3 -c \"import sys,json; print\\(json.load\\(sys.stdin\\)['version']\\)\")",
+      "Bash(node:*)"
     ]
   }
 }

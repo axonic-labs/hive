@@ -2,7 +2,7 @@ import { Router } from 'express';
 import git from 'isomorphic-git';
 import fs from 'node:fs';
 import { listSpaces, saveSpaceConfig, deleteSpaceDir, getSpacePermissions, saveSpacePermissions, getSpaceConfig, spaceRepoDir } from '../config/manager.js';
-import { validateSpaceName, createSpaceTable, dropSpaceTable } from '../db/spaces.js';
+import { validateSpaceName, createSpaceTable, dropSpaceTable, createChatlogTable, dropChatlogTable } from '../db/spaces.js';
 import { getPool, removePool, testConnection } from '../db/pools.js';
 import { removeProvider } from '../providers/resolve.js';
 import { badRequest, notFound } from '../middleware/error-handler.js';
@@ -24,11 +24,14 @@ adminSpacesRouter.post('/', async (req, res, next) => {
     const spaceKind = kind || 'files';
     const spaceProvider = provider || req.body.type || 'postgres';
 
-    if (spaceKind !== 'files') {
-      throw badRequest('Only "files" kind is currently supported');
+    if (!['files', 'chatlog'].includes(spaceKind)) {
+      throw badRequest('kind must be "files" or "chatlog"');
     }
     if (spaceProvider !== 'postgres' && spaceProvider !== 'git') {
       throw badRequest('Provider must be "postgres" or "git"');
+    }
+    if (spaceKind === 'chatlog' && spaceProvider !== 'postgres') {
+      throw badRequest('Chatlog spaces only support postgres provider');
     }
 
     if (spaceProvider === 'postgres') {
@@ -37,12 +40,16 @@ adminSpacesRouter.post('/', async (req, res, next) => {
       const connError = await testConnection(database_url);
       if (connError) throw badRequest(`Could not connect: ${connError}`);
 
-      saveSpaceConfig(name, { kind: 'files', provider: 'postgres', database_url });
+      saveSpaceConfig(name, { kind: spaceKind, provider: 'postgres', database_url } as any);
 
       const pool = getPool(name);
-      await createSpaceTable(pool, name);
+      if (spaceKind === 'chatlog') {
+        await createChatlogTable(pool, name);
+      } else {
+        await createSpaceTable(pool, name);
+      }
     } else {
-      // Git provider
+      // Git provider (files only)
       const config: Record<string, string> = { kind: 'files', provider: 'git' };
       if (remote_url) config.remote_url = remote_url;
       if (remote_branch) config.remote_branch = remote_branch;
@@ -69,7 +76,11 @@ adminSpacesRouter.delete('/:space', async (req, res, next) => {
     if (config.provider === 'postgres') {
       try {
         const pool = getPool(space);
-        await dropSpaceTable(pool, space);
+        if (config.kind === 'chatlog') {
+          await dropChatlogTable(pool, space);
+        } else {
+          await dropSpaceTable(pool, space);
+        }
       } catch {
         // Table may not exist, continue with cleanup
       }
