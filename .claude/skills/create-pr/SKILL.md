@@ -28,17 +28,21 @@ pnpm run test 2>/dev/null || echo "No test script"
 
 Same failure policy: fix once, retry. If still failing, stop and report.
 
-### Step 3: Local code review
+### Step 3: Self-review
 
-Invoke the `/review` command to run local code review against the diff from `main`.
+Review your own diff against `main`:
 
-If the review surfaces issues:
-1. Fix the issues
-2. Commit the fixes
-3. Re-invoke `/review`
-4. Repeat up to **3 iterations** total
+```bash
+git diff origin/main...HEAD
+```
 
-If after 3 iterations issues remain, present the outstanding items and ask the user whether to proceed anyway.
+Check for:
+- Leftover debug code, console.logs, TODOs
+- Unused imports or variables
+- Security issues (hardcoded secrets, injection vectors)
+- Anything that doesn't match the existing code style
+
+If issues are found: fix them and commit the fixes. Repeat up to **3 iterations**. If issues remain, present them to the user and ask whether to proceed.
 
 ### Step 4: Check for existing PR
 
@@ -104,5 +108,5 @@ Print:
 - Always target `main` branch for PRs
 - PR titles must be under 72 characters
 - If tests or build fail and you can't fix them, do NOT create the PR — report to user
-- The `/review` command is the local code review — treat its feedback seriously, fix real issues
+- Take self-review seriously — fix real issues before creating the PR
 - Use `pnpm` (never `npm`)

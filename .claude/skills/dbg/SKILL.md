@@ -11,7 +11,8 @@ Debug production issues for the **Hive** project on Railway.
 ## Setup
 
 1. Read `.claude/skills/dbg/secrets.md` for credentials.
-2. Use the `RAILWAY_TOKEN`, `DB_URL`, and `LOKI_URL` values from that file.
+2. Use the `RAILWAY_TOKEN`, `DB_URL`, `SERVICE_ID`, `ENVIRONMENT_ID`, and `LOKI_URL` values from that file.
+3. `SERVICE_ID` and `ENVIRONMENT_ID` are required for Railway deployment queries. If missing from secrets, ask the user to add them (find them in the Railway dashboard).
 
 > **IMPORTANT — Credential Setup:**
 > In every Bash call that needs secrets, assign them as **single-quoted** variables at the top, then use `$VARIABLE` references. Single quotes prevent shell interpretation of special characters in tokens. Shell state does not persist between Bash calls, so re-set variables in every call that needs them.
@@ -47,10 +48,12 @@ Query Railway API for the latest deployment:
 
 ```bash
 RAILWAY_TOKEN='<from secrets>'
+SERVICE_ID='<from secrets>'
+ENVIRONMENT_ID='<from secrets>'
 curl -s https://backboard.railway.com/graphql/v2 \
   -H "Authorization: Bearer $RAILWAY_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"query": "{ deployments(input: { serviceId: \"SERVICE_ID\", environmentId: \"ENV_ID\" }, first: 1) { edges { node { id status createdAt } } } }"}'
+  -d "{\"query\": \"{ deployments(input: { serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENVIRONMENT_ID\\\" }, first: 1) { edges { node { id status createdAt } } } }\"}"
 ```
 
 ### Step 3: Pull Deployment Logs
@@ -67,11 +70,17 @@ curl -s https://backboard.railway.com/graphql/v2 \
 ### Step 4: Query Loki for Application Logs (when configured)
 
 ```bash
+# macOS:
+START=$(date -u -v-1H +%s)
+# Linux:
+# START=$(date -u -d "1 hour ago" +%s)
+END=$(date -u +%s)
+
 curl -s "$LOKI_URL/loki/api/v1/query_range" \
   --data-urlencode 'query={level="error"}' \
   --data-urlencode 'limit=100' \
-  --data-urlencode "start=$(date -u -v-1H +%s)000000000" \
-  --data-urlencode "end=$(date -u +%s)000000000"
+  --data-urlencode "start=${START}000000000" \
+  --data-urlencode "end=${END}000000000"
 ```
 
 ### Step 5: Query Database

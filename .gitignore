@@ -3,6 +3,6 @@ dist/
 *.tsbuildinfo
 .env
 /data/
-.claude/
+.claude/*
 !.claude/skills/
 .claude/skills/*/secrets.md
