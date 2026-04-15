@@ -19,11 +19,8 @@ export function AgentDetail() {
   const [running, setRunning] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, []);
-
   const startPolling = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     let pollCount = 0;
     const maxPolls = 200;
     pollRef.current = setInterval(async () => {
@@ -53,6 +50,7 @@ export function AgentDetail() {
       setRunning(data.running || false);
       if (data.running) startPolling();
     });
+    return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
   }, [name]);
 
   const handleSave = async () => {
