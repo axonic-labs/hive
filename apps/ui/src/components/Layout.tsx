@@ -34,6 +34,7 @@ export function Layout() {
           </span>
           <div style={{ display: 'flex', gap: 4 }}>
             <NavItem to="/spaces">Spaces</NavItem>
+            {user?.is_admin && <NavItem to="/agents">Agents</NavItem>}
             {user?.is_admin && <NavItem to="/users">Users</NavItem>}
           </div>
         </div>

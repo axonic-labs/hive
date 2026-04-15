@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
-import type { User, SpaceConfig, SpacePermissionEntry } from '@hive/shared';
+import type { User, SpaceConfig, SpacePermissionEntry, AgentConfig, LLMConfig } from '@hive/shared';
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
 
@@ -99,4 +99,47 @@ export function saveSpacePermissions(space: string, perms: SpacePermissionEntry[
   const dir = path.join(spacesDir(), space);
   ensureDir(dir);
   fs.writeFileSync(path.join(dir, 'permissions.json'), JSON.stringify(perms, null, 2));
+}
+
+// Agents
+
+const agentsDir = () => path.join(DATA_DIR, 'agents');
+
+export function listAgentConfigs(): AgentConfig[] {
+  const dir = agentsDir();
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir)
+    .filter(f => f.endsWith('.json'))
+    .map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')));
+}
+
+export function getAgentConfig(name: string): AgentConfig | null {
+  const file = path.join(agentsDir(), `${name}.json`);
+  if (!fs.existsSync(file)) return null;
+  return JSON.parse(fs.readFileSync(file, 'utf-8'));
+}
+
+export function saveAgentConfig(name: string, config: AgentConfig): void {
+  ensureDir(agentsDir());
+  fs.writeFileSync(path.join(agentsDir(), `${name}.json`), JSON.stringify(config, null, 2));
+}
+
+export function deleteAgentConfig(name: string): void {
+  const file = path.join(agentsDir(), `${name}.json`);
+  if (fs.existsSync(file)) fs.unlinkSync(file);
+}
+
+// LLM Config
+
+const llmConfigPath = () => path.join(DATA_DIR, 'config', 'llm.json');
+
+export function getLLMConfig(): LLMConfig | null {
+  const file = llmConfigPath();
+  if (!fs.existsSync(file)) return null;
+  return JSON.parse(fs.readFileSync(file, 'utf-8'));
+}
+
+export function saveLLMConfig(config: LLMConfig): void {
+  ensureDir(path.dirname(llmConfigPath()));
+  fs.writeFileSync(llmConfigPath(), JSON.stringify(config, null, 2));
 }

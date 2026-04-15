@@ -23,8 +23,8 @@ export interface SpacePermissionEntry {
 }
 
 export interface SpaceConfig {
-  type: 'postgres';
-  database_url: string;
+  type: 'filesystem' | 'postgres';
+  database_url?: string;
   schema?: 'files' | 'chatlog';
 }
 
@@ -71,4 +71,30 @@ export interface FileListEntry {
 export interface ApiError {
   error: string;
   status: number;
+}
+
+export interface AgentConfig {
+  name: string;
+  user_id: string;
+  schedule: string | null;
+  model: string | null;
+  prompt: string;
+  enabled: boolean;
+  timeout_ms: number;
+  log_space: string;
+  log_thread_prefix: string;
+  created_at: string;
+}
+
+export interface LLMConfig {
+  provider: 'anthropic' | 'openai';
+  api_key: string;
+  default_model: string;
+}
+
+export interface AgentRunSummary {
+  thread: string;
+  started_at: string;
+  status: 'success' | 'error' | 'timeout';
+  duration_ms: number;
 }
