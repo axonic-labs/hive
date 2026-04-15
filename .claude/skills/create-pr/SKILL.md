@@ -30,7 +30,7 @@ Same failure policy: fix once, retry. If still failing, stop and report.
 
 ### Step 3: Local code review
 
-Invoke the `superpowers:requesting-code-review` skill to run a local code review.
+Invoke the `superpowers:requesting-code-review` skill to review changes relative to the `develop` branch.
 
 If the review surfaces issues:
 1. Fix the issues
@@ -46,7 +46,7 @@ If after 3 iterations issues remain, present the outstanding items and ask the u
 gh pr list --head "$(git branch --show-current)" --json number,url --jq '.[0]'
 ```
 
-If a PR already exists: report its URL, skip PR creation, but still push new commits and **always run Step 6** (request GitHub review).
+If a PR already exists: report its URL, push new commits (run the push command from Step 5), skip PR creation, and **always run Step 6** (request GitHub review).
 
 ### Step 5: Push and create PR
 
