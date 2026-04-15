@@ -48,7 +48,7 @@ export function createTools(hive: HiveClient, notesSpace: string, chatSpace: str
       execute: async ({ prefix }) => {
         const files = await hive.listFiles(notesSpace, prefix);
         if (files.length === 0) return prefix ? `No files found under "${prefix}".` : 'No files found.';
-        return files.map((f) => `${f.path}${f.filename}`).join('\n');
+        return files.map((f) => f.path ? `${f.path}/${f.filename}` : f.filename).join('\n');
       },
     }),
 
@@ -60,7 +60,7 @@ export function createTools(hive: HiveClient, notesSpace: string, chatSpace: str
       execute: async ({ query }) => {
         const results = await hive.searchFiles(notesSpace, query);
         if (results.length === 0) return `No notes found matching "${query}".`;
-        return results.map((r) => `**${r.path}${r.filename}** (relevance: ${r.rank.toFixed(2)})\n${r.headline}`).join('\n\n');
+        return results.map((r) => `**${r.path ? `${r.path}/${r.filename}` : r.filename}** (relevance: ${r.rank.toFixed(2)})\n${r.headline}`).join('\n\n');
       },
     }),
 

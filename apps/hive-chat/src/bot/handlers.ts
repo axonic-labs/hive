@@ -50,7 +50,6 @@ export async function handleTextMessage(deps: HandlerDeps, chatId: number, text:
   // Fetch context
   let recentMessages: ChatMessage[] = [];
   let anchorContent: string | null = null;
-  let contextFailed = false;
 
   try {
     [recentMessages, anchorContent] = await Promise.all([
@@ -59,7 +58,6 @@ export async function handleTextMessage(deps: HandlerDeps, chatId: number, text:
     ]);
   } catch (err) {
     console.error('Failed to fetch context from Hive:', err);
-    contextFailed = true;
     await telegram.sendMessage(chatId, "Having trouble reaching my memory right now. I'll respond without full context.");
   }
 

@@ -15,7 +15,7 @@ const bot = setupBot(config.telegramBotToken, {
   chatThread: config.chatThread,
   anchorFile: config.anchorFile,
   contextMessageCount: config.contextMessageCount,
-});
+}, config.contactMap);
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -34,7 +34,7 @@ async function start() {
 
   try {
     await bot.telegram.setWebhook(webhookUrl);
-    console.log(`Webhook set to ${webhookUrl}`);
+    console.log(`Webhook registered at ${config.webhookUrl}/webhook/***`);
   } catch (err) {
     console.error('Failed to set webhook:', err);
     process.exit(1);

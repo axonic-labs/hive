@@ -46,6 +46,25 @@ describe('createTools', () => {
     expect(result).toContain('Written');
   });
 
+  it('list_notes joins path and filename correctly for nested files', async () => {
+    (mockClient.listFiles as any).mockResolvedValue([
+      { id: '1', path: '', filename: 'elias.md', created_at: '', updated_at: '' },
+      { id: '2', path: 'work/projects', filename: 'hive.md', created_at: '', updated_at: '' },
+    ]);
+    const tools = createTools(mockClient, 'notes', 'diary');
+    const result = await tools.list_notes.execute!({}, {} as any);
+    expect(result).toBe('elias.md\nwork/projects/hive.md');
+  });
+
+  it('search_notes joins path and filename correctly for nested files', async () => {
+    (mockClient.searchFiles as any).mockResolvedValue([
+      { id: '1', path: 'work/projects', filename: 'hive.md', created_at: '', updated_at: '', headline: 'matched text', rank: 0.95 },
+    ]);
+    const tools = createTools(mockClient, 'notes', 'diary');
+    const result = await tools.search_notes.execute!({ query: 'hive' }, {} as any);
+    expect(result).toContain('**work/projects/hive.md**');
+  });
+
   it('search_chat_history calls hive client', async () => {
     (mockClient.searchMessages as any).mockResolvedValue([
       { content: 'found it', headline: '<b>found</b> it', rank: 1, thread: 't', author: 'user', id: '1', source: null, created_by: null, created_at: '' },

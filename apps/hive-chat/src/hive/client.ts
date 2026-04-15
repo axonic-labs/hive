@@ -23,6 +23,7 @@ export class HiveClient {
 
   async getRecentMessages(space: string, thread: string, limit: number): Promise<ChatMessage[]> {
     const res = await this.request(`/data/${space}/messages?thread=${encodeURIComponent(thread)}&limit=${limit}&order=desc`);
+    if (res.status === 404) return [];
     const messages: ChatMessage[] = await res.json();
     return messages.reverse();
   }
@@ -37,6 +38,7 @@ export class HiveClient {
 
   async searchMessages(space: string, query: string): Promise<ChatSearchResult[]> {
     const res = await this.request(`/data/${space}/search?q=${encodeURIComponent(query)}`);
+    if (res.status === 404) return [];
     return res.json();
   }
 
@@ -66,11 +68,13 @@ export class HiveClient {
   async listFiles(space: string, prefix?: string): Promise<FileListEntry[]> {
     const q = prefix ? `?prefix=${encodeURIComponent(prefix)}` : '';
     const res = await this.request(`/data/${space}/files${q}`);
+    if (res.status === 404) return [];
     return res.json();
   }
 
   async searchFiles(space: string, query: string): Promise<SearchResult[]> {
     const res = await this.request(`/data/${space}/search?q=${encodeURIComponent(query)}`);
+    if (res.status === 404) return [];
     return res.json();
   }
 }
