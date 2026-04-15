@@ -1,0 +1,9 @@
+[build]
+buildCommand = "pnpm install && pnpm run build"
+
+[deploy]
+startCommand = "pnpm start"
+healthcheckPath = "/.well-known/hive"
+
+[[mounts]]
+mountPath = "/data"
