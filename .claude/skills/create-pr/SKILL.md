@@ -1,6 +1,6 @@
 ---
 name: create-pr
-description: Build, test, run local code review, create PR to main, and trigger GitHub review. Use when code is done and ready for PR.
+description: Build, test, run local code review, create PR to develop, and trigger GitHub review. Use when code is done and ready for PR.
 argument-hint: "[optional: PR title override]"
 ---
 
@@ -28,21 +28,17 @@ pnpm run test 2>/dev/null || echo "No test script"
 
 Same failure policy: fix once, retry. If still failing, stop and report.
 
-### Step 3: Self-review
+### Step 3: Local code review
 
-Review your own diff against `main`:
+Invoke the `superpowers:requesting-code-review` skill to review changes relative to the `develop` branch.
 
-```bash
-git diff origin/main...HEAD
-```
+If the review surfaces issues:
+1. Fix the issues
+2. Commit the fixes
+3. Re-invoke the review
+4. Repeat up to **3 iterations** total
 
-Check for:
-- Leftover debug code, console.logs, TODOs
-- Unused imports or variables
-- Security issues (hardcoded secrets, injection vectors)
-- Anything that doesn't match the existing code style
-
-If issues are found: fix them and commit the fixes. Repeat up to **3 iterations**. If issues remain, present them to the user and ask whether to proceed.
+If after 3 iterations issues remain, present the outstanding items and ask the user whether to proceed anyway.
 
 ### Step 4: Check for existing PR
 
@@ -50,7 +46,7 @@ If issues are found: fix them and commit the fixes. Repeat up to **3 iterations*
 gh pr list --head "$(git branch --show-current)" --json number,url --jq '.[0]'
 ```
 
-If a PR already exists: report its URL, skip PR creation, but still push new commits and trigger review (Step 6).
+If a PR already exists: report its URL, push new commits (run the push command from Step 5), skip PR creation, and **always run Step 6** (request GitHub review).
 
 ### Step 5: Push and create PR
 
@@ -70,7 +66,7 @@ Create the PR:
 
 ```bash
 gh pr create \
-  --base main \
+  --base develop \
   --title "<prefix>: <summary under 72 chars>" \
   --body "$(cat <<'EOF'
 ## Summary
@@ -91,22 +87,27 @@ If `$ARGUMENTS` is provided and non-empty, use it as the PR title instead of gen
 
 Store the PR number from the output.
 
-### Step 6: Request GitHub review
+### Step 6: Request GitHub review (MANDATORY)
+
+**This step must ALWAYS run — whether creating a new PR or pushing to an existing one.**
 
 ```bash
 gh pr comment <PR_NUMBER> --body "@claude please review"
 ```
 
+Do NOT skip this step. Do NOT end without running this command.
+
 ### Step 7: Report to user
 
 Print:
 - PR URL
-- Reminder that @claude review has been requested
+- Confirmation that `@claude please review` was posted
 
 ## Instructions
 
-- Always target `main` branch for PRs
+- Always target `develop` branch for PRs (never `main`)
 - PR titles must be under 72 characters
 - If tests or build fail and you can't fix them, do NOT create the PR — report to user
-- Take self-review seriously — fix real issues before creating the PR
+- The local code review is mandatory — treat its feedback seriously, fix real issues
+- The `@claude please review` comment is mandatory — never skip it
 - Use `pnpm` (never `npm`)
