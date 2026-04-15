@@ -4,6 +4,7 @@
 Hive is an open-source personal cloud. Your domain = your identity = your cloud. Agents and people are contacts with scoped access to your data.
 
 ## Key docs
+- `README.md` — Setup instructions, deploy button, quick-start
 - `requirements.md` — Original vision & 7-layer architecture (aspirational, not all implemented)
 - `openapi.yaml` — Full OpenAPI 3.1 spec for the current API
 - `AGENTS.md` — Agent integration guide
@@ -98,7 +99,6 @@ Sanity-check the request before writing code:
 | **MVP alignment** | Does this fit MVP scope, or is it premature complexity? |
 
 If concerns arise, raise them before starting. For complex tasks (new schema, new endpoints, cross-layer changes, vague requirements), interview the user to build a plan before implementing.
-
 ## Dev workflow
 ```bash
 pnpm install

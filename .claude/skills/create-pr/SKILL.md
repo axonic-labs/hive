@@ -44,7 +44,11 @@ Check for:
 
 If issues are found: fix them and commit the fixes. Repeat up to **3 iterations**. If issues remain, present them to the user and ask whether to proceed.
 
-### Step 4: Check for existing PR
+### Step 4: Update setup docs if needed
+
+If the diff touches environment variables, configuration, deployment config, or dependency changes, check whether `README.md` or `.env.example` need updating. If so, update them and commit the changes.
+
+### Step 5: Check for existing PR
 
 ```bash
 gh pr list --head "$(git branch --show-current)" --json number,url --jq '.[0]'
@@ -52,7 +56,7 @@ gh pr list --head "$(git branch --show-current)" --json number,url --jq '.[0]'
 
 If a PR already exists: report its URL, skip PR creation, but still push new commits and trigger review (Step 6).
 
-### Step 5: Push and create PR
+### Step 6: Push and create PR
 
 Push the branch:
 
@@ -91,13 +95,13 @@ If `$ARGUMENTS` is provided and non-empty, use it as the PR title instead of gen
 
 Store the PR number from the output.
 
-### Step 6: Request GitHub review
+### Step 7: Request GitHub review
 
 ```bash
 gh pr comment <PR_NUMBER> --body "@claude please review"
 ```
 
-### Step 7: Report to user
+### Step 8: Report to user
 
 Print:
 - PR URL
